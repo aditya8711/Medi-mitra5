@@ -4,7 +4,14 @@ import { io } from 'socket.io-client';
 let socket = null;
 
 export function getSocket() {
-  if (socket) return socket;
+  if (socket && socket.connected) return socket;
+  
+  // Disconnect existing socket if it exists but is not connected
+  if (socket) {
+    socket.disconnect();
+    socket = null;
+  }
+  
   const url = import.meta.env.VITE_API_URL;
   const authToken = typeof window !== 'undefined' ? window.__AUTH_TOKEN : undefined;
   console.log("🔌 Creating socket connection:", {

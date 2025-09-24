@@ -6,12 +6,25 @@ export const checkUserStatus = createAsyncThunk(
   'auth/checkUserStatus',
   async (_, { rejectWithValue }) => {
     try {
+      // Restore token from localStorage if available
+      const storedToken = localStorage.getItem('authToken');
+      if (storedToken) {
+        window.__AUTH_TOKEN = storedToken;
+      }
+      
       const res = await api.apiFetch('/api/auth/me');
       if (!res.ok) {
+        // Clear stored token if auth fails
+        localStorage.removeItem('authToken');
+        delete window.__AUTH_TOKEN;
         return rejectWithValue('No active session');
       }
+      
       return res.data.user;
     } catch (error) {
+      // Clear stored token on error
+      localStorage.removeItem('authToken');
+      delete window.__AUTH_TOKEN;
       return rejectWithValue(error.message);
     }
   }
@@ -36,6 +49,9 @@ const authSlice = createSlice({
       state.user = null;
       state.isAuthenticated = false;
       state.authStatus = 'idle';
+      // Clear stored token on logout
+      localStorage.removeItem('authToken');
+      delete window.__AUTH_TOKEN;
     },
   },
   extraReducers: (builder) => {

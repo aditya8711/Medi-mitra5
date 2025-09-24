@@ -63,8 +63,9 @@ const Signup = () => {
       }
       if (!res.ok) throw new Error(data.message || "Signup failed");
 
-      // Store token for shared socket client
+      // Store token for shared socket client and persistence
       window.__AUTH_TOKEN = data.token;
+      localStorage.setItem('authToken', data.token);
 
       // After signup → connect socket.io
       const socket = io(API_URL, { 

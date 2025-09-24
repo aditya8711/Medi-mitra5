@@ -159,6 +159,14 @@ export default function useWebRTC(user) {
     };
   }, [user]);
 
+  // Re-register user when user state changes (e.g., after auth check)
+  useEffect(() => {
+    if (user?._id && socketRef.current?.connected) {
+      console.log("🔄 Re-registering user with socket:", user._id);
+      socketRef.current.emit("register", user._id);
+    }
+  }, [user?._id]);
+
   const startCall = async (targetUserId) => {
     if (!pcRef.current || !targetUserId) return;
     remoteUserIdRef.current = targetUserId;
