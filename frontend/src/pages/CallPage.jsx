@@ -1,27 +1,49 @@
 // frontend/src/pages/CallPage.jsx
-import { useEffect } from "react";
-import { useParams } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useParams, useSearchParams } from "react-router-dom";
 import useWebRTC from "../hooks/useWebRTC";
 import { useSelector } from "react-redux";
+import api from "../utils/api";
 
 export default function CallPage() {
   const { id: appointmentId } = useParams();
+  const [searchParams] = useSearchParams();
+  const [resolvedPatientId, setResolvedPatientId] = useState(searchParams.get("patientId"));
   const user = useSelector((state) => state.auth.user);
-  const { localVideoRef, remoteVideoRef, startCall, answerCall, incomingOffer } =
+  const { localVideoRef, remoteVideoRef, startCall, answerCall } =
     useWebRTC(user);
 
+  // Patient auto-answers when an offer arrives
   useEffect(() => {
     if (user?.role === "patient") {
-      // 🔑 Always try to answer when joining the call page
-      // because incomingOffer was set in hook
       answerCall();
     }
   }, [user, answerCall]);
 
+  // Doctor: if patientId not provided, resolve from appointment API
+  useEffect(() => {
+    const needsResolve = user?.role === "doctor" && !resolvedPatientId && appointmentId;
+    if (!needsResolve) return;
+
+    (async () => {
+      const res = await api.apiFetch(`/api/appointments/${appointmentId}`);
+      if (res.ok && res.data?.patient?._id) {
+        setResolvedPatientId(res.data.patient._id);
+      } else {
+        console.warn("Failed to resolve patientId from appointment", res);
+      }
+    })();
+  }, [user, resolvedPatientId, appointmentId]);
+
   const handleDoctorStart = () => {
     if (user?.role === "doctor") {
-      console.log("Doctor starting call with patient:", appointmentId);
-      startCall(appointmentId);
+      const targetUserId = resolvedPatientId || null;
+      console.log("Doctor starting call", { appointmentId, targetUserId });
+      if (targetUserId) {
+        startCall(targetUserId);
+      } else {
+        console.warn("No patientId available. Cannot start call.");
+      }
     }
   };
 
@@ -52,6 +74,8 @@ export default function CallPage() {
           <button
             onClick={handleDoctorStart}
             className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg"
+            disabled={!resolvedPatientId}
+            title={!resolvedPatientId ? "Resolving patient..." : "Start Call"}
           >
             Start Call
           </button>

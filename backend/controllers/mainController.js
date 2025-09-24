@@ -2,9 +2,7 @@ import mongoose from 'mongoose';
 import Appointment from '../models/Appointment.js';
 import Prescription from '../models/Prescription.js';
 import User from '../models/User.js';
-/**
- * Get history of attended patients for a doctor
- */
+
 export const getAttendedPatients = async (req, res) => {
   try {
     if (req.user.role !== 'doctor') {

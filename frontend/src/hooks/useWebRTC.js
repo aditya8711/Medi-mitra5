@@ -10,6 +10,7 @@ export default function useWebRTC(user) {
   const pcRef = useRef(null);
   const socketRef = useRef(null);
   const localStreamRef = useRef(null);
+  const remoteUserIdRef = useRef(null);
 
   useEffect(() => {
     socketRef.current = getSocket();
@@ -36,10 +37,10 @@ export default function useWebRTC(user) {
 
     // Handle ICE candidates
     pcRef.current.onicecandidate = (event) => {
-      if (event.candidate) {
+      if (event.candidate && remoteUserIdRef.current) {
         socketRef.current.emit("webrtc:ice-candidate", {
           candidate: event.candidate,
-          to: user?.role === "doctor" ? "patient" : "doctor",
+          to: remoteUserIdRef.current,
         });
       }
     };
@@ -63,29 +64,45 @@ export default function useWebRTC(user) {
       }
     })();
 
-    // Incoming offer
-    socketRef.current.on("webrtc:offer", async (offer) => {
-      console.log("📥 Incoming Offer:", offer);
-      setIncomingOffer(offer); // keep for patient to answer
-    });
+    // Incoming offer: payload shape { offer, from }
+    const handleOffer = async (payload) => {
+      console.log("📥 Incoming Offer:", payload);
+      if (!payload?.offer) return;
+      remoteUserIdRef.current = payload.from || null;
+      setIncomingOffer(payload);
+    };
 
-    // Incoming answer
-    socketRef.current.on("webrtc:answer", async (answer) => {
-      console.log("📥 Incoming Answer:", answer);
-      if (pcRef.current) {
-        await pcRef.current.setRemoteDescription(new RTCSessionDescription(answer));
-      }
-    });
-
-    // Incoming ICE
-    socketRef.current.on("webrtc:ice-candidate", async (candidate) => {
-      console.log("📥 Incoming ICE Candidate:", candidate);
+    // Incoming answer: payload shape { answer, from }
+    const handleAnswer = async (payload) => {
+      console.log("📥 Incoming Answer:", payload);
       try {
-        await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+        if (pcRef.current && payload?.answer) {
+          await pcRef.current.setRemoteDescription(
+            new RTCSessionDescription(payload.answer)
+          );
+        }
+      } catch (err) {
+        console.error("Error applying remote answer:", err);
+      }
+    };
+
+    // Incoming ICE: payload shape { candidate, from }
+    const handleIce = async (payload) => {
+      console.log("📥 Incoming ICE Candidate:", payload);
+      try {
+        if (pcRef.current && payload?.candidate) {
+          await pcRef.current.addIceCandidate(
+            new RTCIceCandidate(payload.candidate)
+          );
+        }
       } catch (err) {
         console.error("Error adding ICE candidate:", err);
       }
-    });
+    };
+
+    socketRef.current.on("webrtc:offer", handleOffer);
+    socketRef.current.on("webrtc:answer", handleAnswer);
+    socketRef.current.on("webrtc:ice-candidate", handleIce);
 
     return () => {
       if (localStreamRef.current) {
@@ -95,22 +112,23 @@ export default function useWebRTC(user) {
         pcRef.current.close();
       }
       if (socketRef.current) {
-        socketRef.current.off("webrtc:offer");
-        socketRef.current.off("webrtc:answer");
-        socketRef.current.off("webrtc:ice-candidate");
+        socketRef.current.off("webrtc:offer", handleOffer);
+        socketRef.current.off("webrtc:answer", handleAnswer);
+        socketRef.current.off("webrtc:ice-candidate", handleIce);
       }
     };
   }, [user]);
 
-  const startCall = async (patientId) => {
-    if (!pcRef.current) return;
+  const startCall = async (targetUserId) => {
+    if (!pcRef.current || !targetUserId) return;
+    remoteUserIdRef.current = targetUserId;
     try {
       const offer = await pcRef.current.createOffer();
       await pcRef.current.setLocalDescription(offer);
 
       socketRef.current.emit("webrtc:offer", {
         offer,
-        to: patientId,
+        to: targetUserId,
       });
 
       console.log("📤 Sent Offer:", offer);
@@ -124,15 +142,18 @@ export default function useWebRTC(user) {
 
     try {
       await pcRef.current.setRemoteDescription(
-        new RTCSessionDescription(incomingOffer)
+        new RTCSessionDescription(incomingOffer.offer)
       );
 
       const answer = await pcRef.current.createAnswer();
       await pcRef.current.setLocalDescription(answer);
 
+      const toUserId = incomingOffer.from;
+      remoteUserIdRef.current = toUserId || remoteUserIdRef.current;
+
       socketRef.current.emit("webrtc:answer", {
         answer,
-        to: incomingOffer.from,
+        to: toUserId,
       });
 
       console.log("📤 Sent Answer:", answer);
