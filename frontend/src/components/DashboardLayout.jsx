@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useLanguage } from '../utils/LanguageProvider';
 import DashboardHeader from './DashboardHeader';
 import ButtonBar from './ButtonBar'; // This will be used in the sidebar for mobile
 
@@ -71,6 +72,9 @@ export default function DashboardLayout({
           {/* Action buttons appear at the bottom of the mobile menu */}
           <div className="sidebar-actions">
             <ButtonBar />
+            <div style={{ marginTop: 10 }}>
+              <SidebarLang />
+            </div>
           </div>
         </aside>
 
@@ -88,6 +92,18 @@ export default function DashboardLayout({
           {children}
         </main>
       </div>
+    </div>
+  );
+}
+
+function SidebarLang() {
+  const { lang, setLang } = useLanguage();
+  const style = { padding: '6px 8px', borderRadius: 6, marginRight: 6, border: '1px solid rgba(255,255,255,0.06)', background: 'transparent', color: '#fff', cursor: 'pointer' };
+  return (
+    <div style={{ display: 'flex', gap: 6 }}>
+      <button style={{ ...style, fontWeight: lang === 'en' ? 700 : 500 }} onClick={() => setLang('en')}>EN</button>
+      <button style={{ ...style, fontWeight: lang === 'hi' ? 700 : 500 }} onClick={() => setLang('hi')}>हिंदी</button>
+      <button style={{ ...style, fontWeight: lang === 'pa' ? 700 : 500 }} onClick={() => setLang('pa')}>ਪੰਜਾਬੀ</button>
     </div>
   );
 }

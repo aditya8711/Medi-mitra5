@@ -57,6 +57,10 @@ const Signup = () => {
         body: JSON.stringify(form),
       });
       const data = await res.json();
+      if (res.status === 409) {
+        setError("An account with this email or phone already exists.");
+        return;
+      }
       if (!res.ok) throw new Error(data.message || "Signup failed");
 
       // After signup → connect socket.io

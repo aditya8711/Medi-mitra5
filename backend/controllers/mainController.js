@@ -2,7 +2,26 @@ import mongoose from 'mongoose';
 import Appointment from '../models/Appointment.js';
 import Prescription from '../models/Prescription.js';
 import User from '../models/User.js';
-
+/**
+ * Get history of attended patients for a doctor
+ */
+export const getAttendedPatients = async (req, res) => {
+  try {
+    if (req.user.role !== 'doctor') {
+      return res.status(403).json({ success: false, message: 'Access denied. Only doctors can view attended patients.' });
+    }
+    const attendedAppointments = await Appointment.find({
+      doctor: req.user.id,
+      status: 'completed'
+    })
+    .populate('patient', 'name email uniqueId')
+    .sort({ date: -1 });
+    return res.json({ success: true, data: attendedAppointments });
+  } catch (err) {
+    console.error('getAttendedPatients:error', err);
+    return res.status(500).json({ success: false, message: 'Failed to fetch attended patients.', error: err.message });
+  }
+};
 export const getDoctorQueue = async (req, res) => {
   try {
     if (req.user.role !== 'doctor') {

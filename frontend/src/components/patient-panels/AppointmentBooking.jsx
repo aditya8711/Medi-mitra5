@@ -2,32 +2,32 @@ import React, { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { fetchPatientData } from '../../utils/dashboardSlice'; // Adjust path if needed
 import api from '../../utils/api';
+import { useLanguage } from '../../utils/LanguageProvider';
 
 const AppointmentBooking = ({ appointments, doctors, onBookingSuccess }) => {
   const [booking, setBooking] = useState({ doctor: '', date: '', symptoms: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const dispatch = useDispatch();
+  const { t } = useLanguage();
 
   const handleRequestCall = async () => {
     if (!booking.doctor || !booking.date || !booking.symptoms) {
-      setError('All fields are required.');
+      setError(t('pleaseSelectSymptom'));
       return;
     }
     setLoading(true);
     setError('');
 
-    // ✅ PROACTIVELY REQUEST PERMISSIONS
+    // Request media permissions (for video consult)
     try {
-      // This will trigger the browser's permission pop-up
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-      // We got permission, so we can immediately stop the tracks as we don't need them yet.
       stream.getTracks().forEach(track => track.stop());
     } catch (err) {
       console.error("Media permissions denied:", err);
-      setError("Camera and microphone access is required to book a video consultation. Please grant permission and try again.");
+      setError(t('aiError'));
       setLoading(false);
-      return; // Stop the booking if permission is denied
+      return;
     }
 
     const appointmentData = {
@@ -39,7 +39,7 @@ const AppointmentBooking = ({ appointments, doctors, onBookingSuccess }) => {
     try {
       const res = await api.apiFetch('/api/appointments', {
         method: 'POST',
-        body: JSON.stringify(appointmentData),
+        body: appointmentData,
       });
 
       if (res.ok) {
@@ -58,24 +58,24 @@ const AppointmentBooking = ({ appointments, doctors, onBookingSuccess }) => {
 
   return (
     <div>
-      <h2>Book Consultation</h2>
+      <h2>{t('bookConsultation')}</h2>
       <div className="simple-card">
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div>
-            <label className="small">Doctor</label>
+            <label className="small">{t('doctorLabel')}</label>
             <select
               value={booking.doctor}
               onChange={(e) => setBooking({ ...booking, doctor: e.target.value })}
               className="input-style"
             >
-              <option value="">Select a doctor</option>
+              <option value="">{t('selectDoctor')}</option>
               {doctors.map(d => (
                 <option key={d._id} value={d._id}>{d.name} ({d.specialization})</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="small">Date and Time</label>
+            <label className="small">{t('dateTime')}</label>
             <input
               type="datetime-local"
               value={booking.date}
@@ -84,7 +84,7 @@ const AppointmentBooking = ({ appointments, doctors, onBookingSuccess }) => {
             />
           </div>
           <div>
-            <label className="small">Symptoms (comma-separated)</label>
+            <label className="small">{t('symptomsLabel')}</label>
             <input
               type="text"
               value={booking.symptoms}
@@ -96,13 +96,13 @@ const AppointmentBooking = ({ appointments, doctors, onBookingSuccess }) => {
           {error && <p style={{ color: '#ff4d4f' }}>{error}</p>}
           <div>
             <button className="btn btn-primary" onClick={handleRequestCall} disabled={loading}>
-              {loading ? 'Requesting...' : 'Request Call'}
+              {loading ? t('checking') : t('requestCall')}
             </button>
           </div>
         </div>
       </div>
       <div className="simple-card">
-        <h4>Recent Appointments</h4>
+        <h4>{t('recentAppointments')}</h4>
         {appointments && appointments.length > 0 ? (
           appointments.map(a => (
             <div key={a._id} className="queue-item">
@@ -110,7 +110,7 @@ const AppointmentBooking = ({ appointments, doctors, onBookingSuccess }) => {
               <span style={{ textTransform: 'capitalize' }}>{a.status}</span>
             </div>
           ))
-        ) : <p>No recent appointments.</p>}
+        ) : <p>{t('noRecentAppointments')}</p>}
       </div>
     </div>
   );

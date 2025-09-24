@@ -1,0 +1,73 @@
+.premium-overview {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+/* Match app dark card style */
+.premium-card {
+  background: #0f1616; /* same as .simple-card */
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 18px;
+  color: #eafaf7;
+}
+
+.premium-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.premium-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.premium-subtitle {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.detail-item {
+  background: rgba(255,255,255,0.02);
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.03);
+  color: #eafaf7;
+}
+
+.badge {
+  display: inline-block;
+  background: rgba(14,246,204,0.12);
+  color: var(--accent);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.actions-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.upcoming-list, .prescription-list {
+  display: grid;
+  gap: 8px;
+}
+
+@media (max-width: 800px) {
+  .premium-overview { grid-template-columns: 1fr; }
+  .details-grid { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,222 @@
+import React, { createContext, useContext, useState } from "react";
+
+const translations = {
+  en: {
+    overview: "Overview",
+    book: "Book Appointment",
+    records: "Health Records",
+    liveStock: "Live Medicine Stock",
+    incomingCall: "Incoming Call from Dr.",
+    decline: "Decline",
+    accept: "Accept",
+    patientDashboard: "Patient Dashboard",
+    backToHome: "Back to Home"
+    ,
+    symptomCheckerTitle: "AI Symptom Checker",
+  // localized symptom labels (array)
+  symptomsList: ["Fever","Cough","Headache","Fatigue","Shortness of breath","Body ache","Sore throat","Nausea","Vomiting","Diarrhea","Constipation","Stomach pain","Chest pain","Back pain","Joint pain","Dizziness","Loss of appetite","Weight loss","Swelling (Edema)","Skin rash","Itching","Chills","Runny nose","Eye redness","Ear pain","Toothache","Burning urination","Frequent urination"],
+  // prefix for AI query to provide in-language prompt
+  patientQueryPrefix: "Patient reports the following symptoms:",
+    selectSymptoms: "Select symptoms you're experiencing:",
+    checkSymptomsButton: "Check Symptoms",
+    checking: "Checking...",
+    pleaseSelectSymptom: "⚠️ Please select at least one symptom.",
+    aiNoResponse: "⚠️ No response from AI.",
+    aiError: "❌ Failed to fetch AI response. Please try again.",
+    bookConsultation: "Book Consultation",
+    doctorLabel: "Doctor",
+    dateTime: "Date and Time",
+    symptomsLabel: "Symptoms (comma-separated)",
+    selectDoctor: "Select a doctor",
+    requestCall: "Request Call",
+    recentAppointments: "Recent Appointments",
+    noRecentAppointments: "No recent appointments.",
+    recentPrescriptions: "Recent Prescriptions",
+    upcomingAppointments: "Upcoming Appointments",
+    patientDetails: "Patient Details",
+    healthSnapshot: "Health Snapshot",
+    activeMedicines: "Active Medicines",
+    appointmentsLabel: "Appointments",
+    prescriptionsLabel: "Prescriptions",
+    bookAppointmentBtn: "Book Appointment",
+    viewRecordsBtn: "View Records",
+    medicineTrackerBtn: "Medicine Tracker",
+    download: "Download",
+    myPrescriptions: "My Prescriptions",
+    noPrescriptionsFound: "No prescriptions found.",
+    medicineTrackerTitle: "Medicine Tracker",
+    currentMedicinesTitle: "Current Medicines",
+    previousMedicinesTitle: "Previous Medicines",
+    markTaken: "Mark taken",
+    taken: "Taken ✓",
+    fromLabel: "From",
+    toLabel: "To",
+    prescriber: "Prescribed by",
+    notesLabel: "Notes",
+    nameLabel: "Name",
+    uniqueIdLabel: "Unique ID",
+    ageLabel: "Age",
+    genderLabel: "Gender",
+    contactLabel: "Contact",
+    addressLabel: "Address",
+    emergencyLabel: "Emergency Contact"
+    ,
+    loading: "Loading...",
+    panelNotFound: "Panel not found"
+  },
+  hi: {
+    overview: "सारांश",
+    book: "अपॉइंटमेंट बुक करें",
+    records: "स्वास्थ्य रिकॉर्ड",
+    liveStock: "दवा स्टॉक",
+    incomingCall: "डॉ. से कॉल आ रही है",
+    decline: "अस्वीकार करें",
+    accept: "स्वीकार करें",
+    patientDashboard: "मरीज डैशबोर्ड",
+    backToHome: "होम पर वापस जाएं"
+    ,
+    symptomCheckerTitle: "एआई लक्षण जाँच",
+  symptomsList: ["बुखार","खाँसी","सिरदर्द","थकान","साँस में तकलीफ","शरीर में दर्द","गला ख़राब","उल्टी","वमन","दस्त","कब्ज","पेट दर्द","छाती में दर्द","कमर का दर्द","जोड़ों में दर्द","चक्कर","भूख में कमी","वजन कम होना","सूजन (एडीमा)","त्वचा पर चकत्ते","खुजली","काँपना","नाक बहना","आँख लाल होना","कान में दर्द","दाँत दर्द","पेशाब करते समय जलन","बार-बार पेशाब"],
+  patientQueryPrefix: "रोगी नीचे दिए गए लक्षण बता रहे हैं:",
+    selectSymptoms: "अपनी शिकायत वाले लक्षण चुनें:",
+    checkSymptomsButton: "लक्षण जाँचें",
+    checking: "जाँच हो रही है...",
+    pleaseSelectSymptom: "⚠️ कृपया कम से कम एक लक्षण चुनें.",
+    aiNoResponse: "⚠️ एआई से कोई उत्तर नहीं मिला.",
+    aiError: "❌ एआई प्रतिक्रिया लाने में विफल। कृपया पुनः प्रयास करें.",
+    bookConsultation: "कंसल्टेशन बुक करें",
+    doctorLabel: "डॉक्टर",
+    dateTime: "दिनांक और समय",
+    symptomsLabel: "लक्षण (कॉमा से अलग करें)",
+    selectDoctor: "डॉक्टर चुनें",
+    requestCall: "कॉल अनुरोध करें",
+    recentAppointments: "हाल की अपॉइंटमेंट",
+    noRecentAppointments: "कोई हाल की अपॉइंटमेंट नहीं।",
+    recentPrescriptions: "हाल की प्रिस्क्रिप्शन",
+    upcomingAppointments: "आगामी अपॉइंटमेंट",
+    patientDetails: "रोगी विवरण",
+    healthSnapshot: "स्वास्थ्य स्नैपशॉट",
+    activeMedicines: "सक्रिय दवाइयाँ",
+    appointmentsLabel: "अपॉइंटमेंट",
+    prescriptionsLabel: "प्रिस्क्रिप्शन",
+    bookAppointmentBtn: "अपॉइंटमेंट बुक करें",
+    viewRecordsBtn: "रिकॉर्ड देखें",
+    medicineTrackerBtn: "दवा ट्रैकर",
+    download: "डाउनलोड",
+    myPrescriptions: "मेरी प्रिस्क्रिप्शन",
+    noPrescriptionsFound: "कोई प्रिस्क्रिप्शन नहीं मिली.",
+    medicineTrackerTitle: "दवा ट्रैकर",
+    currentMedicinesTitle: "वर्तमान दवाइयाँ",
+    previousMedicinesTitle: "पूर्व दवाइयाँ",
+    markTaken: "खायी हुई चिन्हित करें",
+    taken: "खायी गई ✓",
+    fromLabel: "से",
+    toLabel: "तक",
+    prescriber: "निदेशक",
+    notesLabel: "नोट्स",
+    nameLabel: "नाम",
+    uniqueIdLabel: "यूनिक आईडी",
+    ageLabel: "आयु",
+    genderLabel: "लिंग",
+    contactLabel: "संपर्क",
+    addressLabel: "पता",
+    emergencyLabel: "आपातकालीन संपर्क"
+    ,
+    loading: "लोड हो रहा है...",
+    panelNotFound: "पैनल नहीं मिला"
+  },
+  pa: {
+    overview: "ਸਾਰ",
+    book: "ਮੁਲਾਕਾਤ ਬੁੱਕ ਕਰੋ",
+    records: "ਸਿਹਤ ਰਿਕਾਰਡ",
+    liveStock: "ਦਵਾਈ ਸਟਾਕ",
+    incomingCall: "ਡਾਕਟਰ ਵਲੋਂ ਕਾਲ ਆ ਰਹੀ ਹੈ",
+    decline: "ਇਨਕਾਰ ਕਰੋ",
+    accept: "ਸਵੀਕਾਰ ਕਰੋ",
+    patientDashboard: "ਮਰੀਜ਼ ਡੈਸ਼ਬੋਰਡ",
+    backToHome: "ਮੁੱਖ ਪੰਨੇ ਤੇ ਵਾਪਸ ਜਾਓ"
+    ,
+    symptomCheckerTitle: "ਏਆਈ ਲੱਛਣ ਚੈਕਰ",
+  symptomsList: ["ਬੁਖਾਰ","ਖੰਘ","ਸਿਰਦਰਦ","ਥਕਾਵਟ","ਸਾਸ ਲੈਣ ਵਿੱਚ ਤਕਲੀਫ","ਸਰੀਰ ਦਰਦ","ਗਲਾ ਦਰਦ","ਮਤਲੀ","ਉਲਟੀ","ਦਸਤ","ਕਬਜ਼","ਪੀਟ ਦਰਦ","ਛਾਤੀ ਦਰਦ","ਕੰਢ ਦਰਦ","ਜੋੜ ਦਰਦ","ਚੱਕਰ","ਭੁੱਖ ਘਟਣਾ","ਵਜ਼ਨ ਘਟਣਾ","ਸੂਜ਼ਣ (ਏਡੀਮਾ)","ਚਮੜੀ ਤੇ ਰੈਸ਼","ਖੁਜਲੀ","ਕੰਬਣ","ਨਾੱਕ ਬਹਿਣਾ","ਅੱਖ ਲਾਲ ਹੋਣਾ","ਕਾਨ ਦਰਦ","ਦੰਦ ਦਰਦ","ਪੇਸ਼ਾਬ ਕਰਦਿਆਂ ਜ਼ਲਨ","ਅਕਸਰ ਪੇਸ਼ਾਬ"],
+  patientQueryPrefix: "ਮਰੀਜ਼ ਹੇਠਾਂ ਦਿੱਤੇ ਲੱਛਣ ਦਰਜ ਕਰਦਾ ਹੈ:",
+    selectSymptoms: "ਆਪਣੇ ਲੱਛਣ ਚੁਣੋ:",
+    checkSymptomsButton: "ਲੱਛਣਾਂ ਜਾਂਚੋ",
+    checking: "ਜਾਂਚ ਕਰ ਰਹੇ ਹਾਂ...",
+    pleaseSelectSymptom: "⚠️ ਕਿਰਪਾ ਕਰਕੇ ਘੱਟੋ-ਘੱਟ ਇੱਕ ਲੱਛਣ ਚੁਣੋ.",
+    aiNoResponse: "⚠️ ਏਆਈ ਵੱਲੋਂ ਕੋਈ ਜਵਾਬ ਨਹੀਂ ਮਿਲਿਆ.",
+    aiError: "❌ ਏਆਈ ਜਵਾਬ ਲਿਆਉਣ ਵਿੱਚ ਅਸਫਲ। ਕਿਰਪਾ ਕਰਕੇ ਫਿਰ ਕੋਸ਼ਿਸ਼ ਕਰੋ.",
+    bookConsultation: "ਕਨਸਲਟੇਸ਼ਨ ਬੁੱਕ ਕਰੋ",
+    doctorLabel: "ਡਾਕਟਰ",
+    dateTime: "ਤਾਰੀਖ ਅਤੇ ਸਮਾਂ",
+    symptomsLabel: "ਲੱਛਣ (ਕੋਮਾ ਨਾਲ ਵੱਖਰੇ)",
+    selectDoctor: "ਡਾਕਟਰ ਚੁਣੋ",
+    requestCall: "ਕਾਲ ਬੇਨਤੀ ਕਰੋ",
+    recentAppointments: "ਹਾਲੀਆ ਅਪਾਇੰਟਮੈਂਟ",
+    noRecentAppointments: "ਕੋਈ ਹਾਲੀਆ ਅਪਾਇੰਟਮੈਂਟ ਨਹੀਂ।",
+    recentPrescriptions: "ਹਾਲੀਆ ਪ੍ਰਿਸਕ੍ਰਿਪਸ਼ਨ",
+    upcomingAppointments: "ਆਉਣ ਵਾਲੀਆਂ ਅਪਾਇੰਟਮੈਂਟ",
+    patientDetails: "ਰੋਗੀ ਵੇਰਵੇ",
+    healthSnapshot: "ਸਿਹਤ ਸਨੇਪਸ਼ਾਟ",
+    activeMedicines: "ਚਲ ਰਹੀਆਂ ਦਵਾਈਆਂ",
+    appointmentsLabel: "ਅਪਾਇੰਟਮੈਂਟ",
+    prescriptionsLabel: "ਪ੍ਰਿਸਕ੍ਰਿਪਸ਼ਨ",
+    bookAppointmentBtn: "ਅਪਾਇੰਟਮੈਂਟ ਬੁੱਕ ਕਰੋ",
+    viewRecordsBtn: "ਰਿਕਾਰਡ ਵੇਖੋ",
+    medicineTrackerBtn: "ਦਵਾਈ ਟਰੈੱਕਰ",
+    download: "ਡਾਊਨਲੋਡ",
+    myPrescriptions: "ਮੇਰੀ ਪ੍ਰਿਸਕ੍ਰਿਪਸ਼ਨ",
+    noPrescriptionsFound: "ਕੋਈ ਪ੍ਰਿਸਕ੍ਰਿਪਸ਼ਨ ਨਹੀਂ ਮਿਲੀ.",
+    medicineTrackerTitle: "ਦਵਾਈ ਟਰੈੱਕਰ",
+    currentMedicinesTitle: "ਮੌਜੂਦਾ ਦਵਾਈਆਂ",
+    previousMedicinesTitle: "ਪਿਛਲੀਆਂ ਦਵਾਈਆਂ",
+    markTaken: "ਲਿਆ ਹੋਇਆ ਮੰਨੋ",
+    taken: "ਲਿਆ ਗਿਆ ✓",
+    fromLabel: "ਤੋਂ",
+    toLabel: "ਤੱਕ",
+    prescriber: "ਨਿਰਦੇਸ਼ਕ",
+    notesLabel: "ਨੋਟਸ",
+    nameLabel: "ਨਾਂ",
+    uniqueIdLabel: "ਯੂਨੀਕ ਆਈਡੀ",
+    ageLabel: "ਉਮਰ",
+    genderLabel: "ਲਿੰਗ",
+    contactLabel: "ਸੰਪਰਕ",
+    addressLabel: "ਪਤਾ",
+    emergencyLabel: "ਐਮਰਜੈਂਸੀ ਸੰਪਰਕ"
+    ,
+    loading: "ਲੋਡ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ...",
+    panelNotFound: "ਪੈਨਲ ਨਹੀਂ ਮਿਲਿਆ"
+  }
+};
+
+const LanguageContext = createContext();
+
+export function LanguageProvider({ children }) {
+  // Initialize from localStorage if available
+  const initial = (typeof window !== 'undefined' && window.localStorage && window.localStorage.getItem('mm_lang')) || 'en';
+  const [lang, setLangRaw] = useState(initial);
+  const setLang = (l) => {
+    setLangRaw(l);
+    try { if (typeof window !== 'undefined' && window.localStorage) window.localStorage.setItem('mm_lang', l); } catch(e){}
+  };
+  const t = key => (translations[lang] && translations[lang][key]) || key;
+  // Avoid JSX in .js file to keep Vite import-analysis happy.
+  return React.createElement(
+    LanguageContext.Provider,
+    { value: { lang, setLang, t } },
+    children
+  );
+}
+
+export function useLanguage() {
+  const ctx = useContext(LanguageContext);
+  if (!ctx) {
+    // Fallback: return a safe default so components don't crash if the provider
+    // hasn't been mounted (useful during incremental changes / HMR).
+    return {
+      lang: 'en',
+      setLang: () => {},
+      t: (key) => (translations['en'] && translations['en'][key]) || key,
+    };
+  }
+  return ctx;
+}
