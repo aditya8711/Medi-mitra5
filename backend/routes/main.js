@@ -1,3 +1,8 @@
+
+
+
+
+
 import express from 'express';
 import { authenticateJWT, authorizeRoles } from '../middleware/auth.js';
 import {
@@ -9,6 +14,7 @@ import {
   getDoctorQueue,
   getAppointmentById,
   completeAppointment,
+  getAttendedPatients
 } from '../controllers/mainController.js';
 import { listSockets, listUsers } from '../controllers/debugController.js';
 

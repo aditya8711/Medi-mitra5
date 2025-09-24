@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLanguage } from '../utils/LanguageProvider';
 import { Link } from 'react-router-dom';
 
 // This small component defines the hamburger menu icon
@@ -14,6 +15,19 @@ const HamburgerButton = ({ onClick }) => (
 
 // The props are now simplified to only what's needed
 export default function DashboardHeader({ title, onMenuClick }) {
+  const { lang, setLang } = useLanguage();
+
+  const smallBtn = {
+    padding: '6px 8px',
+    marginLeft: 6,
+    borderRadius: 6,
+    border: '1px solid rgba(255,255,255,0.06)',
+    background: 'transparent',
+    color: '#fff',
+    cursor: 'pointer',
+    fontSize: 12
+  };
+
   return (
     <header className="dashboard-header">
       {/* Left Section */}
@@ -27,8 +41,14 @@ export default function DashboardHeader({ title, onMenuClick }) {
         <div className="header-title">{title || 'Dashboard'}</div>
       </div>
 
-      {/* Right Section is intentionally empty to balance the layout */}
-      <div className="header-right"></div>
+      {/* Right Section - language toggles */}
+      <div className="header-right">
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <button style={{ ...smallBtn, fontWeight: lang === 'en' ? 700 : 500 }} onClick={() => setLang('en')}>EN</button>
+          <button style={{ ...smallBtn, fontWeight: lang === 'hi' ? 700 : 500 }} onClick={() => setLang('hi')}>हिंदी</button>
+          <button style={{ ...smallBtn, fontWeight: lang === 'pa' ? 700 : 500 }} onClick={() => setLang('pa')}>ਪੰਜਾਬੀ</button>
+        </div>
+      </div>
     </header>
   );
 }

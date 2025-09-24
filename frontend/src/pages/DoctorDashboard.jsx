@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
-import { fetchDoctorQueue } from "../utils/dashboardSlice";
+import { fetchDoctorQueue, fetchAttendedPatients } from "../utils/dashboardSlice";
 import DashboardLayout from '../components/DashboardLayout';
 import { getSocket } from '../utils/socket'; // ✅ Import getSocket
 import api from '../utils/api';
@@ -34,13 +34,16 @@ export default function DoctorDashboard() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user: currentUser } = useSelector((state) => state.auth);
-  const { queue: patientQueue, loading } = useSelector((state) => state.dashboard);
+  const { queue: patientQueueRaw, attendedPatients: attendedPatientsRaw, loading } = useSelector((state) => state.dashboard);
+  const patientQueue = Array.isArray(patientQueueRaw) ? patientQueueRaw : [];
+  const attendedPatients = Array.isArray(attendedPatientsRaw) ? attendedPatientsRaw : [];
 
   // ✅ Get the shared socket instance
   const socket = getSocket();
 
   useEffect(() => {
     dispatch(fetchDoctorQueue());
+    dispatch(fetchAttendedPatients());
   }, [dispatch]);
 
   const handleStartCall = async (patientId, appointmentId) => {
@@ -80,6 +83,29 @@ export default function DoctorDashboard() {
     }
   };
 
+  // attendedPatients now comes from Redux state (fetched from backend)
+
+  const handleDownloadPrescription = (patient) => {
+    const lines = [
+      `Patient Name: ${patient.name}`,
+      `Patient ID: ${patient.id}`,
+      '',
+      'Prescriptions:',
+      ...patient.prescriptions.map((presc, i) => (
+        `${i + 1}. ${presc.medicine} - ${presc.dosage} (${presc.date})\n   Notes: ${presc.notes}`
+      ))
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${patient.name}_prescription.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const renderPanel = () => {
     switch (activePanel) {
       case "dashboard":
@@ -106,6 +132,45 @@ export default function DoctorDashboard() {
             }
           </div>
         );
+      case "attended":
+        return (
+          <div className="simple-card">
+            <h3>Attended Patients</h3>
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 16 }}>
+              <thead>
+                <tr style={{ background: '#0a233a', color: '#00ffd0' }}>
+                  <th style={{ border: '1px solid #00ffd0', padding: '8px' }}>Patient ID</th>
+                  <th style={{ border: '1px solid #00ffd0', padding: '8px' }}>Name</th>
+                  <th style={{ border: '1px solid #00ffd0', padding: '8px' }}>Prescriptions</th>
+                  <th style={{ border: '1px solid #00ffd0', padding: '8px' }}>Download</th>
+                </tr>
+              </thead>
+              <tbody>
+                {attendedPatients.map((p, idx) => (
+                  <tr key={p.id} style={{ background: idx % 2 === 0 ? '#18232e' : 'transparent' }}>
+                    <td style={{ border: '1px solid #00ffd0', padding: '8px', color: '#fff' }}>{p.id}</td>
+                    <td style={{ border: '1px solid #00ffd0', padding: '8px', color: '#fff' }}>{p.name}</td>
+                    <td style={{ border: '1px solid #00ffd0', padding: '8px', color: '#fff' }}>
+                      <ul style={{ margin: 0, paddingLeft: 16 }}>
+                        {p.prescriptions.map((presc, i) => (
+                          <li key={i}>
+                            <strong>{presc.medicine}</strong> - {presc.dosage} ({presc.date})<br />
+                            <span style={{ fontSize: '0.95em', color: '#00ffd0' }}>{presc.notes}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </td>
+                    <td style={{ border: '1px solid #00ffd0', padding: '8px', color: '#fff', textAlign: 'center' }}>
+                      <button className="btn btn-primary" onClick={() => handleDownloadPrescription(p)}>
+                        Download Prescription
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
       default:
         return <div className="simple-card"><h3>{activePanel}</h3></div>;
     }
@@ -114,6 +179,7 @@ export default function DoctorDashboard() {
   const sidebarItems = [
     { key: "dashboard", label: "Dashboard" },
     { key: "queue", label: "Patient Queue" },
+    { key: "attended", label: "Attended Patients" },
     { key: "records", label: "Digital Records" },
   ];
 

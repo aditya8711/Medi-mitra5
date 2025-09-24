@@ -1,3 +1,11 @@
+// Thunk for attended patients (doctor's history)
+export const fetchAttendedPatients = createAsyncThunk(
+  'dashboard/fetchAttendedPatients',
+  async () => {
+    const response = await api.apiFetch('/api/doctor/attended-patients');
+    return response.data || [];
+  }
+);
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import api from './api';
 
@@ -33,6 +41,7 @@ const initialState = {
   appointments: [],
   prescriptions: [],
   doctors: [],
+  attendedPatients: [],
   loading: false,
   error: null,
 };
@@ -58,7 +67,14 @@ const dashboardSlice = createSlice({
         state.doctors = action.payload.doctors;
         state.loading = false;
       })
-      .addCase(fetchPatientData.rejected, (state) => { state.loading = false; });
+      .addCase(fetchPatientData.rejected, (state) => { state.loading = false; })
+      // Attended Patients Logic
+      .addCase(fetchAttendedPatients.pending, (state) => { state.loading = true; })
+      .addCase(fetchAttendedPatients.fulfilled, (state, action) => {
+        state.attendedPatients = action.payload;
+        state.loading = false;
+      })
+      .addCase(fetchAttendedPatients.rejected, (state) => { state.loading = false; });
   },
 });
 
