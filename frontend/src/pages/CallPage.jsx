@@ -55,8 +55,11 @@ export default function CallPage() {
           fromUserName: user?.name || 'Doctor'
         });
         
-        // Start the actual WebRTC call
-        startCall(targetUserId);
+          // Start the actual WebRTC call after a short delay so the patient has time
+          // to receive the notification, navigate to the call page and register their socket room.
+          setTimeout(() => {
+            startCall(targetUserId);
+          }, 700);
       } else {
         console.warn("No patientId available. Cannot start call.");
       }

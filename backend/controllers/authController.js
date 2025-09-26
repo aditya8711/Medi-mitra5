@@ -32,6 +32,11 @@ export const getMe = async (req, res) => {
         phone: user.phone,
         role: user.role,
         uniqueId: user.uniqueId,
+        age: user.age,
+        gender: user.gender,
+        bloodGroup: user.bloodGroup,
+        address: user.address,
+        emergencyContact: user.emergencyContact,
         specialization: user.specialization
       }
     });
@@ -42,10 +47,11 @@ export const getMe = async (req, res) => {
 
 export const signup = async (req, res) => {
   try {
-    const { name, email, phone, password, role, specialization } = req.body;
+    const { name, email, phone, password, role, specialization, age, gender, bloodGroup, address, emergencyContact } = req.body;
 
+    // required core fields
     if (!name || !email || !phone || !password || !role) {
-      return res.status(400).json({ message: 'All fields are required.' });
+      return res.status(400).json({ message: 'Name, email, phone, password and role are required.' });
     }
 
     if (role === 'doctor' && !specialization) {
@@ -64,7 +70,7 @@ export const signup = async (req, res) => {
     const prefix = role === "doctor" ? "D" : "P";
     const uniqueId = `${prefix}-${dateStr}-${randomStr}`;
 
-    const user = new User({
+    const userData = {
       name,
       email,
       phone,
@@ -72,7 +78,11 @@ export const signup = async (req, res) => {
       role,
       uniqueId,
       ...(role === 'doctor' && { specialization }),
-    });
+      // only set patient fields when role is patient
+      ...(role === 'patient' && { age, gender, bloodGroup, address, emergencyContact }),
+    };
+
+    const user = new User(userData);
 
     await user.save();
 
@@ -94,12 +104,52 @@ export const signup = async (req, res) => {
         phone,
         role,
         uniqueId,
+        age: user.age,
+        gender: user.gender,
+        bloodGroup: user.bloodGroup,
+        address: user.address,
+        emergencyContact: user.emergencyContact,
         specialization: user.specialization
       },
       token,
     });
   } catch (err) {
     res.status(500).json({ message: 'Signup failed.' });
+  }
+};
+
+// Update profile (protected route)
+export const updateProfile = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ message: 'Not authenticated.' });
+
+    const allowed = ['name', 'age', 'gender', 'bloodGroup', 'address', 'emergencyContact', 'phone', 'email'];
+    const updates = {};
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) updates[key] = req.body[key];
+    }
+
+    const user = await User.findByIdAndUpdate(userId, updates, { new: true });
+    if (!user) return res.status(404).json({ message: 'User not found.' });
+
+    res.json({ user: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      uniqueId: user.uniqueId,
+      age: user.age,
+      gender: user.gender,
+      bloodGroup: user.bloodGroup,
+      address: user.address,
+      emergencyContact: user.emergencyContact,
+      specialization: user.specialization
+    }});
+  } catch (err) {
+    console.error('UPDATE PROFILE FAILED', err);
+    res.status(500).json({ message: 'Update failed.' });
   }
 };
 

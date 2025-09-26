@@ -1,6 +1,8 @@
 import React, { useState, useRef } from "react";
 import { io } from "socket.io-client";
 import { useNavigate, Link } from "react-router-dom";
+import { useDispatch } from 'react-redux';
+import { loginSuccess } from '../utils/authSlice';
 import AnimatedButton from "../components/AnimatedButton";
 import logo from "../logo.png";
 
@@ -17,11 +19,17 @@ const Signup = () => {
     phone: "",
     password: "",
     role: "patient",
+    age: '',
+    gender: '',
+    bloodGroup: '',
+    address: '',
+    emergencyContact: '',
   });
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   // Handle spotlight effect
   const handleMouseMove = (e) => {
@@ -67,6 +75,13 @@ const Signup = () => {
       window.__AUTH_TOKEN = data.token;
       localStorage.setItem('authToken', data.token);
 
+      // Update redux auth state immediately so overview shows data without refresh
+      try {
+        dispatch(loginSuccess({ user: data.user }));
+      } catch (e) {
+        // ignore if redux not available
+      }
+
       // After signup → connect socket.io
       const socket = io(API_URL, { 
         withCredentials: true,
@@ -77,8 +92,10 @@ const Signup = () => {
         role: data.user?.role,
       });
 
-      window.dispatchEvent(new Event("user-updated"));
-      navigate("/");
+  window.dispatchEvent(new Event("user-updated"));
+  // If patient, go to patient dashboard overview directly
+  if (data.user?.role === 'patient') navigate('/patient');
+  else navigate('/');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -116,14 +133,19 @@ const Signup = () => {
         ref={cardRef}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
-        className="relative w-full max-w-md rounded-2xl border border-teal-700/40 
-                   shadow-xl p-8 flex flex-col justify-center cursor-pointer
-                   bg-[radial-gradient(ellipse_at_top,_rgba(0,129,112,0.15)_0%,_rgba(0,91,65,0.1)_50%,_rgba(15,15,15,0.95)_100%)]
-                   min-h-[600px] max-h-[90vh]"
+        className="w-full max-w-md"
         style={{
-          "--mouse-x": mousePos.x,
-          "--mouse-y": mousePos.y,
-          "--spotlight-color": "rgba(0,129,112,0.3)",
+          background: 'radial-gradient(ellipse at top, rgba(0, 129, 112, 0.15) 0%, rgba(0, 91, 65, 0.1) 50%, rgba(15, 15, 15, 0.95) 100%)',
+          borderRadius: '1.5rem',
+          border: '1.5px solid rgba(0, 129, 112, 0.4)',
+          boxShadow: '0 20px 40px rgba(0,129,112,0.18)',
+          overflow: 'hidden',
+          padding: '2rem',
+          position: 'relative',
+          minHeight: '590px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
         }}
       >
         {/* Spotlight overlay */}
@@ -136,15 +158,36 @@ const Signup = () => {
 
         {/* Content */}
         <div className="relative z-10">
-          <div className="text-center mb-8 mt-10">
-            <h2 className="text-3xl font-bold text-teal-300">Join Medi Mitra</h2>
-            <p className="text-sm text-teal-100/80">
-              Create your account to access healthcare services
-            </p>
+          <div className="text-center mb-6">
+            <div
+              className="inline-flex items-center justify-center rounded-full mb-4"
+              style={{
+                backgroundColor: '#0ef6cc22',
+                width: '80px',
+                height: '80px',
+                margin: '0 auto',
+                overflow: 'hidden',
+              }}
+            >
+              <img
+                src={logo}
+                alt="Medi Mitra Logo"
+                style={{
+                  width: '120px',
+                  height: '120px',
+                  objectFit: 'contain',
+                  filter: 'brightness(0) invert(1)',
+                  display: 'block',
+                }}
+              />
+            </div>
+
+            <h2 className="text-3xl font-bold mb-2" style={{ color: '#0ef6cc' }}>Join Medi Mitra</h2>
+            <p className="text-sm" style={{ color: '#b8fff7' }}>Create your account to access healthcare services</p>
           </div>
 
           {/* Form */}
-          <form className="space-y-4" onSubmit={handleSubmit}>
+          <form className="space-y-3" onSubmit={handleSubmit}>
             {/* Name */}
             <InputField
               label="Full Name"
@@ -221,6 +264,7 @@ const Signup = () => {
                 name="specialization"
                 value={form.specialization || ""}
                 onChange={handleChange}
+                placeholder="Specialization"
                 options={[
                   "General Physician",
                   "Neurologist",
@@ -258,6 +302,62 @@ const Signup = () => {
                 ]}
                 required
               />
+            )}
+
+            {/* Patient optional fields */}
+            {form.role === 'patient' && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <InputField
+                    label="Age"
+                    type="number"
+                    name="age"
+                    value={form.age || ''}
+                    onChange={handleChange}
+                    placeholder="Optional"
+                  />
+
+                  <SelectField
+                    label="Gender"
+                    name="gender"
+                    value={form.gender || ''}
+                    onChange={handleChange}
+                    options={["Male", "Female", "Other"]}
+                    placeholder="Select gender"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <InputField
+                    label="Blood Group"
+                    type="text"
+                    name="bloodGroup"
+                    value={form.bloodGroup || ''}
+                    onChange={handleChange}
+                    placeholder="Optional e.g. A+"
+                  />
+
+                  <InputField
+                    label="Emergency Contact"
+                    type="tel"
+                    name="emergencyContact"
+                    value={form.emergencyContact || ''}
+                    onChange={handleChange}
+                    placeholder="Optional phone"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-teal-100/80">Address</label>
+                  <textarea
+                    name="address"
+                    value={form.address || ''}
+                    onChange={handleChange}
+                    placeholder="Optional"
+                    className="w-full max-w-full p-3 rounded-lg border-2 border-teal-400/30 bg-slate-800/70 text-teal-50 placeholder-gray-400 focus:border-teal-400 transition-all duration-200 resize-none box-border"
+                  />
+                </div>
+              </div>
             )}
 
             {/* Error */}
@@ -305,7 +405,7 @@ const InputField = ({ label, ...props }) => (
     </label>
     <input
       {...props}
-      className="w-full p-3 rounded-lg border-2 border-teal-400/30 bg-slate-800/70 
+      className="w-full max-w-full box-border p-3 rounded-lg border-2 border-teal-400/30 bg-slate-800/70 
                  text-teal-50 placeholder-gray-400 focus:border-teal-400 
                  transition-all duration-200"
     />
@@ -320,10 +420,10 @@ const SelectField = ({ label, options, ...props }) => (
     </label>
     <select
       {...props}
-      className="w-full p-3 rounded-lg border-2 border-teal-400/30 bg-slate-800/70 
+      className="w-full max-w-full box-border p-3 rounded-lg border-2 border-teal-400/30 bg-slate-800/70 
                  text-teal-50 focus:border-teal-400 transition-all duration-200"
     >
-      <option value="">Select Specialization</option>
+      <option value="">{props.placeholder || `Select ${label}`}</option>
       {options.map((opt) => (
         <option key={opt} value={opt}>
           {opt}

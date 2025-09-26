@@ -2,6 +2,15 @@ import React, { createContext, useContext, useState } from "react";
 
 const translations = {
   en: {
+    todaysSchedule: "Today's Schedule",
+    noAppointmentsToday: "No appointments scheduled for today.",
+    activityFeed: "Activity Feed",
+    noRecentActivity: "No recent activity.",
+    announcements: "Announcements",
+    noAnnouncements: "No announcements. Use this to share practice notes or maintenance windows.",
+    refreshQueue: "Refresh Queue",
+    refreshRecords: "Refresh Records",
+    visited: "Visited",
     overview: "Overview",
     book: "Book Appointment",
     records: "Health Records",
@@ -65,6 +74,15 @@ const translations = {
     panelNotFound: "Panel not found"
   },
   hi: {
+    todaysSchedule: "आज का शेड्यूल",
+    noAppointmentsToday: "आज के लिए कोई अपॉइंटमेंट निर्धारित नहीं है।",
+    activityFeed: "गतिविधि फ़ीड",
+    noRecentActivity: "कोई हालिया गतिविधि नहीं।",
+    announcements: "घोषणाएँ",
+    noAnnouncements: "कोई घोषणाएँ नहीं। नोट्स या रखरखाव विंडो साझा करने के लिए इसका उपयोग करें।",
+    refreshQueue: "क्यू ताज़ा करें",
+    refreshRecords: "रिकॉर्ड ताज़ा करें",
+    visited: "दौरा किया",
     overview: "सारांश",
     book: "अपॉइंटमेंट बुक करें",
     records: "स्वास्थ्य रिकॉर्ड",
@@ -126,6 +144,15 @@ const translations = {
     panelNotFound: "पैनल नहीं मिला"
   },
   pa: {
+    todaysSchedule: "ਅੱਜ ਦਾ ਸ਼ਡਿਊਲ",
+    noAppointmentsToday: "ਅੱਜ ਲਈ ਕੋਈ ਨਿਯੁਕਤੀ ਨਿਰਧਾਰਿਤ ਨਹੀਂ ਹੈ।",
+    activityFeed: "ਗਤੀਵਿਧੀ ਫੀਡ",
+    noRecentActivity: "ਕੋਈ ਹਾਲੀਆ ਗਤੀਵਿਧੀ ਨਹੀਂ।",
+    announcements: "ਘੋਸ਼ਨਾਵਾਂ",
+    noAnnouncements: "ਕੋਈ ਘੋਸ਼ਨਾਵਾਂ ਨਹੀਂ। ਪ੍ਰੈਕਟਿਸ ਨੋਟਸ ਜਾਂ ਮੈਂਟੇਨੈਂਸ ਵਿੰਡੋਜ਼ ਸਾਂਝੇ ਕਰਨ ਲਈ ਇਸਦਾ ਉਪਯੋਗ ਕਰੋ।",
+    refreshQueue: "ਕਿਊ ਤਾਜ਼ਾ ਕਰੋ",
+    refreshRecords: "ਰਿਕਾਰਡ ਤਾਜ਼ਾ ਕਰੋ",
+    visited: "ਵਿਜ਼ਿਟ ਕੀਤੀ",
     overview: "ਸਾਰ",
     book: "ਮੁਲਾਕਾਤ ਬੁੱਕ ਕਰੋ",
     records: "ਸਿਹਤ ਰਿਕਾਰਡ",

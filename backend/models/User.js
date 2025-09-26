@@ -7,6 +7,12 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   role: { type: String, enum: ['patient', 'doctor'], required: true },
   uniqueId: { type: String, required: true, unique: true },
+  // Optional patient profile fields
+  age: { type: Number },
+  gender: { type: String },
+  bloodGroup: { type: String },
+  address: { type: String },
+  emergencyContact: { type: String },
   createdAt: { type: Date, default: Date.now },
   pendingAppointments: [{
     type: mongoose.Schema.Types.ObjectId,

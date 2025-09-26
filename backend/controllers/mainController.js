@@ -197,10 +197,13 @@ export const startCall = async (req, res) => {
 
     const io = req.app.get('io');
     if (io) {
-      io.to(patientId).emit('webrtc:offer', {
+      // Emit a start-call notification (do not send an empty RTC offer from the server)
+      io.to(patientId).emit('webrtc:start-call', {
         from: req.user.id,
-        fromUserName: req.user.name, // ✅ Doctor's name is now included
+        fromUserName: req.user.name,
         appointmentId,
+        timestamp: Date.now(),
+        type: 'call-notification',
       });
     }
 

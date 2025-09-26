@@ -21,13 +21,78 @@ const AppointmentBooking = ({ appointments, doctors, onBookingSuccess }) => {
 
     // Request media permissions (for video consult)
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-      stream.getTracks().forEach(track => track.stop());
+      // feature detect and attempt video+audio, fallback to audio-only, and finally to legacy APIs
+      const getMedia = async () => {
+        if (typeof navigator === 'undefined') return null; // non-browser environment
+
+        const tryModern = async (constraints) => {
+          if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+            return navigator.mediaDevices.getUserMedia(constraints);
+          }
+          return null;
+        };
+
+        const tryLegacy = (constraints) => {
+          const getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+          if (!getUserMedia) return null;
+          return new Promise((resolve, reject) => {
+            getUserMedia.call(navigator, constraints, resolve, reject);
+          });
+        };
+
+        // 1) Try video+audio via modern API
+        try {
+          const s = await tryModern({ audio: true, video: true });
+          if (s) return s;
+        } catch (e) {
+          // If permission denied, propagate so we stop the flow
+          if (e && (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError')) throw e;
+          // otherwise fall through to try audio-only
+        }
+
+        // 2) Try audio-only via modern API
+        try {
+          const s = await tryModern({ audio: true, video: false });
+          if (s) return s;
+        } catch (e) {
+          if (e && (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError')) throw e;
+        }
+
+        // 3) Legacy APIs: try video+audio, then audio-only
+        try {
+          const s = await tryLegacy({ audio: true, video: true });
+          if (s) return s;
+        } catch (e) {
+          if (e && (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError')) throw e;
+        }
+        try {
+          const s = await tryLegacy({ audio: true, video: false });
+          if (s) return s;
+        } catch (e) {
+          if (e && (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError')) throw e;
+        }
+
+        // nothing available
+        return null;
+      };
+
+      const stream = await getMedia();
+      if (stream && typeof stream.getTracks === 'function') {
+        stream.getTracks().forEach(track => track.stop());
+      } else {
+        // No stream available: not supported in this environment. Show a non-blocking warning and continue booking.
+        setError(t('mediaNotSupported') || 'Camera/microphone not available. Booking will proceed without media.');
+      }
     } catch (err) {
-      console.error("Media permissions denied:", err);
-      setError(t('aiError'));
-      setLoading(false);
-      return;
+      console.error('Media access error:', err);
+      // Permission-denied should block the flow because user must allow
+      if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError' || err.message === 'Permission denied')) {
+        setError(t('mediaPermissionDenied') || 'Camera/microphone permission denied. Please allow access and try again.');
+        setLoading(false);
+        return;
+      }
+      // Any other unexpected error: surface a general message but allow booking to continue
+      setError(t('aiError') || 'Unable to access media devices. Booking will proceed without media.');
     }
 
     const appointmentData = {

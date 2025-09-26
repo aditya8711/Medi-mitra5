@@ -1,6 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import '../../styles/patient-overview.premium.css';
 import { useLanguage } from '../../utils/LanguageProvider';
+import { useDispatch } from 'react-redux';
+import api from '../../utils/api';
+import { loginSuccess } from '../../utils/authSlice';
 
 const compactDate = (d) => {
   try {
@@ -19,6 +22,35 @@ const PatientOverview = ({ user, setActivePanel, appointments = [], prescription
   const recentPrescriptions = (prescriptions || []).slice(0, 3);
 
   const { t } = useLanguage();
+  const dispatch = useDispatch();
+
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({
+    name: user?.name || '',
+    age: user?.age || '',
+    gender: user?.gender || '',
+    bloodGroup: user?.bloodGroup || '',
+    address: user?.address || '',
+    emergencyContact: user?.emergencyContact || '',
+  });
+
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const saveProfile = async () => {
+    try {
+      const res = await api.updateProfile(form);
+      if (!res.ok) throw new Error(res.data?.message || 'Update failed');
+      // Update redux auth user
+      dispatch(loginSuccess({ user: res.data.user }));
+      setEditing(false);
+      window.dispatchEvent(new Event('user-updated'));
+    } catch (err) {
+      console.error('Profile update error', err);
+      alert(err.message || 'Failed to update profile');
+    }
+  };
 
   return (
     <div>
@@ -35,15 +67,27 @@ const PatientOverview = ({ user, setActivePanel, appointments = [], prescription
       <div className="premium-card premium-overview" style={{ marginTop: 14 }}>
         <div>
           <div className="detail-item">
-            <strong>{t('patientDetails')}</strong>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <strong>{t('patientDetails')}</strong>
+              {!editing ? (
+                <button className="btn" onClick={() => setEditing(true)}>Edit</button>
+              ) : (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn" onClick={() => { setEditing(false); setForm({ name: user?.name || '', age: user?.age || '', gender: user?.gender || '', bloodGroup: user?.bloodGroup || '', address: user?.address || '', emergencyContact: user?.emergencyContact || '' }); }}>Cancel</button>
+                  <button className="btn btn-primary" onClick={saveProfile}>Save</button>
+                </div>
+              )}
+            </div>
+
             <div className="details-grid">
-              <div className="detail-item"><strong>{t('nameLabel')}</strong><div>{user?.name || '-'}</div></div>
+              <div className="detail-item"><strong>{t('nameLabel')}</strong><div>{!editing ? (user?.name || '-') : (<input name="name" value={form.name} onChange={handleChange} className="input" />)}</div></div>
               <div className="detail-item"><strong>{t('uniqueIdLabel')}</strong><div>{user?.uniqueId || '-'}</div></div>
-              <div className="detail-item"><strong>{t('ageLabel')}</strong><div>{user?.age ?? '-'}</div></div>
-              <div className="detail-item"><strong>{t('genderLabel')}</strong><div>{user?.gender || '-'}</div></div>
-              <div className="detail-item"><strong>{t('contactLabel')}</strong><div>{user?.phone || user?.email || '-'}</div></div>
-              <div className="detail-item"><strong>{t('emergencyLabel')}</strong><div>{user?.emergencyContact || '-'}</div></div>
-              <div className="detail-item" style={{ gridColumn: '1 / -1' }}><strong>{t('addressLabel')}</strong><div>{user?.address || '-'}</div></div>
+              <div className="detail-item"><strong>{t('ageLabel')}</strong><div>{!editing ? (user?.age ?? '-') : (<input name="age" type="number" value={form.age} onChange={handleChange} className="input" />)}</div></div>
+              <div className="detail-item"><strong>{t('genderLabel')}</strong><div>{!editing ? (user?.gender || '-') : (<select name="gender" value={form.gender} onChange={handleChange} className="input"><option value="">Select</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select>)}</div></div>
+              <div className="detail-item"><strong>{t('contactLabel')}</strong><div>{!editing ? (user?.phone || user?.email || '-') : (<input name="phone" value={form.phone} onChange={handleChange} className="input" />)}</div></div>
+              <div className="detail-item"><strong>{t('emergencyLabel')}</strong><div>{!editing ? (user?.emergencyContact || '-') : (<input name="emergencyContact" value={form.emergencyContact} onChange={handleChange} className="input" />)}</div></div>
+              <div className="detail-item" style={{ gridColumn: '1 / -1' }}><strong>{t('addressLabel')}</strong><div>{!editing ? (user?.address || '-') : (<textarea name="address" value={form.address} onChange={handleChange} className="input" />)}</div></div>
+              <div className="detail-item"><strong>Blood Group</strong><div>{!editing ? (user?.bloodGroup || '-') : (<input name="bloodGroup" value={form.bloodGroup} onChange={handleChange} className="input" />)}</div></div>
             </div>
           </div>
         </div>

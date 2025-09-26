@@ -14,7 +14,7 @@ const HamburgerButton = ({ onClick }) => (
 );
 
 // The props are now simplified to only what's needed
-export default function DashboardHeader({ title, onMenuClick }) {
+export default function DashboardHeader({ title, onMenuClick, onRefresh, quickActions = [] }) {
   const { lang, setLang } = useLanguage();
 
   const smallBtn = {
@@ -29,7 +29,7 @@ export default function DashboardHeader({ title, onMenuClick }) {
   };
 
   return (
-    <header className="dashboard-header">
+    <header className="dashboard-header" style={{ position: 'relative' }}>
       {/* Left Section */}
       <div className="header-left">
         <HamburgerButton onClick={onMenuClick} />
@@ -41,9 +41,19 @@ export default function DashboardHeader({ title, onMenuClick }) {
         <div className="header-title">{title || 'Dashboard'}</div>
       </div>
 
-      {/* Right Section - language toggles */}
+      {/* Right Section - quick actions + refresh + language toggles */}
       <div className="header-right">
         <div style={{ display: 'flex', alignItems: 'center' }}>
+          {/* Quick action buttons */}
+          {Array.isArray(quickActions) && quickActions.map((act, i) => (
+            <button
+              key={i}
+              className={act.variant === 'primary' ? 'btn btn-primary' : (act.variant === 'outline' ? 'btn btn-outline' : 'btn btn-secondary')}
+              onClick={(ev) => { ev.stopPropagation(); act.onClick && act.onClick(); }}
+              style={{ marginRight: 8, padding: '6px 10px', fontSize: 12, minWidth: 120 }}
+            >{act.label}</button>
+          ))}
+
           <button style={{ ...smallBtn, fontWeight: lang === 'en' ? 700 : 500 }} onClick={() => setLang('en')}>EN</button>
           <button style={{ ...smallBtn, fontWeight: lang === 'hi' ? 700 : 500 }} onClick={() => setLang('hi')}>हिंदी</button>
           <button style={{ ...smallBtn, fontWeight: lang === 'pa' ? 700 : 500 }} onClick={() => setLang('pa')}>ਪੰਜਾਬੀ</button>
