@@ -10,6 +10,8 @@ export default function DashboardLayout({
   sidebarItems = [],
   activeKey,
   onSelect,
+  onRefresh,
+  quickActions = [],
   children
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -34,6 +36,8 @@ export default function DashboardLayout({
         subtitle={subtitle}
         currentUser={currentUser}
         onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} // Pass the toggle function
+        onRefresh={onRefresh || children?.props?.onRefresh}
+        quickActions={quickActions}
       />
       
       <div

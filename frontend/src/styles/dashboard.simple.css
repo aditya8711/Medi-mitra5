@@ -23,6 +23,9 @@ body {
   margin-bottom: 12px; 
 }
 
+.full-width { width: 100%; box-sizing: border-box; }
+.input-style { width: 100%; padding: 12px; border-radius: 8px; background: #172022; border: 1px solid rgba(0,0,0,0.2); color: #dfeff0; }
+
 /* --- UPDATED HEADER STYLES --- */
 .dashboard-header {
   display: flex;
@@ -44,6 +47,7 @@ body {
   font-size: 1.5rem; /* Increased font size */
   color: var(--accent); 
 }
+.header-right { display:flex; justify-content:flex-end; align-items:center; }
 .header-left { 
   display: flex; 
   align-items: center; 
@@ -140,6 +144,10 @@ body {
   display: none;
 }
 
+/* PillNav wrap on small screens */
+.pill-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill { min-width: 90px; }
+
 /* --- RESPONSIVE STYLES FOR MOBILE --- */
 @media (max-width: 768px) {
   .dashboard-header .back-button,
@@ -198,6 +206,26 @@ body {
     display: block;
     padding: 16px;
   }
+}
+
+/* Main layout responsiveness */
+@media (max-width: 1024px) {
+  .dashboard-content { padding: 12px; }
+  .simple-main { padding: 12px; }
+  .simple-sidebar { width: 200px; }
+}
+
+@media (max-width: 640px) {
+  .dashboard-header { height: 64px; padding: 8px; }
+  .header-title { font-size: 1.1rem; }
+  .simple-card { padding: 12px; }
+  .incoming-call-card { width: 90%; left: 5%; right: 5%; }
+  .pill-list { gap: 6px; }
+  .pill { min-width: 70px; }
+  .input-style { padding: 10px; }
+  /* Hide long quick action labels on small screens */
+  .dashboard-header .header-right .btn { display: none; }
+  .dashboard-header .header-right button { display: inline-block; }
 }
 /* --- INCOMING CALL NOTIFICATION STYLES --- */
 .incoming-call-card {

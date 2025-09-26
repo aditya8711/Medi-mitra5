@@ -28,4 +28,8 @@ export async function apiFetch(path, options = {}) {
 
 // Example usage
 // const response = await apiFetch('/api/auth/me');
-export default { apiFetch, API_BASE };
+export async function updateProfile(data) {
+  return apiFetch('/api/auth/profile', { method: 'PUT', body: data });
+}
+
+export default { apiFetch, API_BASE, updateProfile };

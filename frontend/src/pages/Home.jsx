@@ -26,7 +26,7 @@ function Home() {
   // This function decides which buttons to show
   const renderAuthButtons = () => {
     // While checking the session, show a placeholder to prevent flicker
-    if (authStatus === 'loading' || authStatus === 'idle') {
+    if (authStatus === 'loading') {
       return <div style={{ height: '52px' }} />; // Placeholder with same height as buttons
     }
 

@@ -1,7 +1,6 @@
 import React, { useState, useRef } from "react";
 import { useEffect } from "react";
 import io from "socket.io-client";
-import Peer from "simple-peer";
 import ReactMarkdown from "react-markdown";
 import AnimatedButton from "./AnimatedButton";
 import logo from "../logo.png";
@@ -47,7 +46,24 @@ export default function HomeAssistant() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       setLocalStream(stream);
-      const p = new Peer({ initiator: true, trickle: false, stream });
+      // dynamically import the browser bundle of simple-peer to avoid importing Node-only modules at module-eval
+      let PeerLib = null;
+      try {
+        // prefer the pre-bundled browser build
+        const mod = await import('simple-peer/simplepeer.min.js');
+        PeerLib = mod && (mod.default || mod);
+      } catch (err) {
+        // fallback to main package (may still work depending on bundler shims)
+        try {
+          const mod = await import('simple-peer');
+          PeerLib = mod && (mod.default || mod);
+        } catch (err2) {
+          console.error('Failed to load simple-peer:', err2);
+          throw new Error('WebRTC library not available');
+        }
+      }
+
+      const p = new PeerLib({ initiator: true, trickle: false, stream });
       setPeer(p);
       p.on("signal", data => {
         socket.emit("webrtc-signal", data);

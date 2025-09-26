@@ -13,6 +13,7 @@ import http from "http";
 import { Server as SocketIOServer } from "socket.io";
 import initSocket from "./services/socket.js";
 import Ragroutes from "./routes/ragRoutes.js";
+import os from "os";   // ✅ Added to detect IPv4
 
 dotenv.config();
 const app = express();
@@ -20,7 +21,7 @@ const PORT = process.env.PORT || 5000;
 
 // ✅ MongoDB connection
 mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ Connected to MongoDB" , mongoose.connection.name))
+  .then(() => console.log("✅ Connected to MongoDB", mongoose.connection.name))
   .catch((err) => console.error("MongoDB connection error:", err));
 
 // ✅ CORS config
@@ -43,7 +44,10 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 app.get("/", (req, res) => {
-  res.status(200).json({ "message": "Hey from backend of Medi-mitra", "ServerHealth": "Excellent" });
+  res.status(200).json({
+    "message": "Hey from backend of Medi-mitra",
+    "ServerHealth": "Excellent"
+  });
 });
 
 app.post("/api/gemini-agent", async (req, res) => {
@@ -101,7 +105,21 @@ app.post("/api/appointments/complete", async (req, res) => {
   }
 });
 
+// ✅ Get system IPv4 automatically
+function getLocalIPv4() {
+  const nets = os.networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === "IPv4" && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+  return "localhost";
+}
+
 // Start server
-server.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
-});
+app.listen(PORT, () => {
+ 
+  console.log(`🚀 Server running on http:/localhost:${PORT}`);
+})

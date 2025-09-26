@@ -65,24 +65,8 @@ export default function useWebRTC(user) {
       }
     };
 
-    // Get local media
-    (async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true,
-        });
-        localStreamRef.current = stream;
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
-        }
-        stream.getTracks().forEach((track) =>
-          pcRef.current.addTrack(track, stream)
-        );
-      } catch (err) {
-        console.error("Error accessing media devices:", err);
-      }
-    })();
+    // Note: we defer requesting local media until the user initiates/answers a call.
+    // Requesting media on mount can cause silent failures in some environments (SSR, embedded webviews).
 
     // Incoming offer: payload shape { offer, from }
     const handleOffer = async (payload) => {
@@ -167,10 +151,63 @@ export default function useWebRTC(user) {
     }
   }, [user?._id]);
 
+  // Helper: request media with fallbacks
+  const getLocalMedia = async () => {
+    const constraintsList = [
+      { video: true, audio: true },
+      { video: false, audio: true },
+    ];
+
+    const tryModern = async (constraints) => {
+      if (typeof navigator === 'undefined') return null;
+      if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+        return navigator.mediaDevices.getUserMedia(constraints);
+      }
+      return null;
+    };
+
+    const tryLegacy = (constraints) => {
+      const getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+      if (!getUserMedia) return null;
+      return new Promise((resolve, reject) => getUserMedia.call(navigator, constraints, resolve, reject));
+    };
+
+    for (const c of constraintsList) {
+      try {
+        const s = await tryModern(c);
+        if (s) return s;
+      } catch (e) {
+        if (e && (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError')) throw e;
+      }
+      try {
+        const s = await tryLegacy(c);
+        if (s) return s;
+      } catch (e) {
+        if (e && (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError')) throw e;
+      }
+    }
+    return null;
+  };
+
   const startCall = async (targetUserId) => {
     if (!pcRef.current || !targetUserId) return;
     remoteUserIdRef.current = targetUserId;
     try {
+      // Ensure we have local media and attach tracks
+      if (!localStreamRef.current) {
+        try {
+          const stream = await getLocalMedia();
+          if (stream) {
+            localStreamRef.current = stream;
+            if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+            stream.getTracks().forEach((track) => pcRef.current.addTrack(track, stream));
+          }
+        } catch (err) {
+          console.error('Permission denied while getting local media for startCall:', err);
+          return; // user denied — stop starting the call
+        }
+      }
+
       const offer = await pcRef.current.createOffer();
       await pcRef.current.setLocalDescription(offer);
 
@@ -192,6 +229,21 @@ export default function useWebRTC(user) {
       await pcRef.current.setRemoteDescription(
         new RTCSessionDescription(incomingOffer.offer)
       );
+
+      // Ensure we have local media and attach tracks before creating answer
+      if (!localStreamRef.current) {
+        try {
+          const stream = await getLocalMedia();
+          if (stream) {
+            localStreamRef.current = stream;
+            if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+            stream.getTracks().forEach((track) => pcRef.current.addTrack(track, stream));
+          }
+        } catch (err) {
+          console.error('Permission denied while getting local media for answerCall:', err);
+          return; // user denied — do not proceed with answering
+        }
+      }
 
       const answer = await pcRef.current.createAnswer();
       await pcRef.current.setLocalDescription(answer);
