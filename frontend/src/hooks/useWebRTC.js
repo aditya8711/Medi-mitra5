@@ -2,22 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import { getSocket } from "../utils/socket";
 
-// Configuration flag for demo mode - set to true for classical STUN-only P2P
-const CLASSIC_P2P_MODE = true;
-const ADD_TURN_BACKUP = true; // ENABLED: Adding TURN for NAT traversal
-
-// Classical STUN-only configuration for reliable peer-to-peer demo
-const CLASSIC_ICE_SERVERS = [
-  { urls: "stun:stun.l.google.com:19302" },
-  { urls: "stun:stun1.l.google.com:19302" }
-];
-
-// Classical + single TURN backup (if needed for NAT traversal)
-const CLASSIC_WITH_TURN = [
-  { urls: "stun:stun.l.google.com:19302" },
-  { urls: "stun:stun1.l.google.com:19302" },
-  { urls: "turn:relay1.expressturn.com:3478", username: "efCZWX3MTI071W2V6N", credential: "mGWa8dVKpR4FgpE" }
-];
+// Restore to working configuration from earlier conversation
+const USE_SIMPLE_CONFIG = true;
 
 export default function useWebRTC(user) {
   const [incomingOffer, setIncomingOffer] = useState(null);
@@ -134,58 +120,58 @@ export default function useWebRTC(user) {
 
   // Helper function to create peer connection with enhanced configuration
   const createPeerConnection = () => {
-    // Use classical STUN-only mode for reliable demo, or full config if disabled
-    const iceServers = CLASSIC_P2P_MODE ? (ADD_TURN_BACKUP ? CLASSIC_WITH_TURN : CLASSIC_ICE_SERVERS) : [
-        // Primary STUN servers (most reliable, unlimited free)
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" },
-        { urls: "stun:stun2.l.google.com:19302" },
-        { urls: "stun:stun3.l.google.com:19302" },
-        { urls: "stun:stun4.l.google.com:19302" },
-        
-        // High-quality TURN servers (more reliable free options)
-        {
-          urls: ["turn:relay1.expressturn.com:3478"],
-          username: "efCZWX3MTI071W2V6N",
-          credential: "mGWa8dVKpR4FgpE"
-        },
-        {
-          urls: ["turn:a.relay.metered.ca:80", "turn:a.relay.metered.ca:80?transport=tcp"],
-          username: "a71c31d416502d8c9b8dec95",
-          credential: "2lrtyK5RqnEIg5hx"
-        },
-        {
-          urls: ["turn:a.relay.metered.ca:443", "turn:a.relay.metered.ca:443?transport=tcp"],
-          username: "a71c31d416502d8c9b8dec95",
-          credential: "2lrtyK5RqnEIg5hx"
-        },
-        
-        // Fallback TURN servers (original working ones as backup)
-        {
-          urls: ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:80?transport=tcp"],
-          username: "openrelayproject",
-          credential: "openrelayproject"
-        },
-        {
-          urls: ["turn:openrelay.metered.ca:443", "turn:openrelay.metered.ca:443?transport=tcp"],
-          username: "openrelayproject", 
-          credential: "openrelayproject"
-        },
-        
-        // Additional free TURN servers for redundancy
-        {
-          urls: ["turn:turn.bistri.com:80"],
-          username: "homeo",
-          credential: "homeo"
-        },
-        {
-          urls: ["turn:turn.anyfirewall.com:443?transport=tcp"],
-          username: "webrtc",
-          credential: "webrtc"
-        }
-      ];
+    // Restore working configuration from earlier successful connections
+    const iceServers = [
+      // Primary STUN servers (most reliable, unlimited free)
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" },
+      { urls: "stun:stun2.l.google.com:19302" },
+      { urls: "stun:stun3.l.google.com:19302" },
+      { urls: "stun:stun4.l.google.com:19302" },
+      
+      // High-quality TURN servers (more reliable free options)
+      {
+        urls: ["turn:relay1.expressturn.com:3478"],
+        username: "efCZWX3MTI071W2V6N",
+        credential: "mGWa8dVKpR4FgpE"
+      },
+      {
+        urls: ["turn:a.relay.metered.ca:80", "turn:a.relay.metered.ca:80?transport=tcp"],
+        username: "a71c31d416502d8c9b8dec95",
+        credential: "2lrtyK5RqnEIg5hx"
+      },
+      {
+        urls: ["turn:a.relay.metered.ca:443", "turn:a.relay.metered.ca:443?transport=tcp"],
+        username: "a71c31d416502d8c9b8dec95",
+        credential: "2lrtyK5RqnEIg5hx"
+      },
+      
+      // Fallback TURN servers (original working ones as backup)
+      {
+        urls: ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:80?transport=tcp"],
+        username: "openrelayproject",
+        credential: "openrelayproject"
+      },
+      {
+        urls: ["turn:openrelay.metered.ca:443", "turn:openrelay.metered.ca:443?transport=tcp"],
+        username: "openrelayproject", 
+        credential: "openrelayproject"
+      },
+      
+      // Additional free TURN servers for redundancy
+      {
+        urls: ["turn:turn.bistri.com:80"],
+        username: "homeo",
+        credential: "homeo"
+      },
+      {
+        urls: ["turn:turn.anyfirewall.com:443?transport=tcp"],
+        username: "webrtc",
+        credential: "webrtc"
+      }
+    ];
 
-    console.log(`🧊 ${CLASSIC_P2P_MODE ? 'Classical' : 'Enhanced'} mode - ICE servers:`, iceServers.map(s => s.urls));
+    console.log('🧊 Restored working ICE servers:', iceServers.length, 'servers');
     
     const pc = new RTCPeerConnection({
       iceServers,
@@ -359,16 +345,15 @@ export default function useWebRTC(user) {
     pc.onicecandidate = (ev) => { if (ev.candidate && remoteUserIdRef.current) socketRef.current.emit('webrtc:ice-candidate', { candidate: ev.candidate, to: remoteUserIdRef.current }); };
     pc.oniceconnectionstatechange = () => {
       const s = pc.iceConnectionState;
-      console.log(`🧊 ICE state ${CLASSIC_P2P_MODE ? '(classical)' : '(stage ' + iceStageRef.current + ')'}:`, s);
+      console.log('🧊 ICE state:', s);
       if (s === 'connected' || s === 'completed') { 
-        if (!CLASSIC_P2P_MODE) clearDiagnostics(); 
+        console.log('✅ WebRTC connection established successfully!');
         setConnectionQuality(s==='completed'?'excellent':'good'); 
         setCallState('active'); 
       }
-      // In classical mode, try ICE restart if failed/disconnected after candidates exchanged
-      else if (CLASSIC_P2P_MODE && s === 'failed' && pc.remoteDescription) {
-        console.log('🔄 Classical mode: Attempting ICE restart for failed connection');
-        pc.restartIce();
+      else if (s === 'disconnected' || s === 'failed') {
+        console.log('❌ WebRTC connection failed, state:', s);
+        setConnectionQuality('poor');
       }
     };
   };
@@ -453,10 +438,8 @@ export default function useWebRTC(user) {
       console.log("📝 Registered user with socket:", user._id);
     }
 
-    // Create RTCPeerConnection
-    /* Replaced original createPeerConnection with staged builder */
-    iceStageRef.current = 0;
-    pcRef.current = buildPeerConnectionForStage(iceStageRef.current);
+    // Create RTCPeerConnection - restore simple working approach
+    pcRef.current = createPeerConnection();
 
     // When remote track arrives, attach it to remote video
     pcRef.current.ontrack = (event) => {
