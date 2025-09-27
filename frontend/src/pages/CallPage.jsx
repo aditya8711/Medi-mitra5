@@ -68,69 +68,201 @@ export default function CallPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-900 text-white">
-      <div className="flex-1 flex">
-        {/* Local Video */}
-        <video
-          ref={localVideoRef}
-          autoPlay
-          playsInline
-          muted
-          className="w-1/3 border-2 border-blue-400 rounded-lg m-4"
-        />
+    <div className="relative w-full h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-slate-800 overflow-hidden">
+      {/* Header Bar */}
+      <div className="absolute top-0 left-0 right-0 z-30 bg-black/20 backdrop-blur-sm border-b border-white/10">
+        <div className="flex items-center justify-between px-6 py-4">
+          {/* Left: Call Info */}
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
+              <span className="text-white font-medium">
+                {user?.role === 'doctor' ? 'Patient Consultation' : 'Doctor Consultation'}
+              </span>
+            </div>
+            <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+              callState === 'idle' ? 'bg-gray-600/80 text-gray-200' :
+              callState === 'incoming' ? 'bg-amber-500/80 text-amber-100' :
+              callState === 'answering' ? 'bg-blue-500/80 text-blue-100' :
+              callState === 'active' ? 'bg-green-500/80 text-green-100' : 'bg-red-500/80 text-red-100'
+            }`}>
+              {callState === 'idle' && 'Waiting to connect...'}
+              {callState === 'incoming' && 'Incoming call'}
+              {callState === 'answering' && 'Connecting...'}
+              {callState === 'active' && 'Connected'}
+              {callState === 'ended' && 'Call ended'}
+            </div>
+          </div>
 
-        {/* Remote Video */}
-        <video
-          ref={remoteVideoRef}
-          autoPlay
-          playsInline
-          className="flex-1 border-2 border-green-400 rounded-lg m-4"
-        />
+          {/* Right: App ID */}
+          <div className="text-white/70 text-sm">
+            Appointment: {appointmentId?.slice(-8)}
+          </div>
+        </div>
       </div>
 
-      {/* Footer Controls */}
-      <div className="p-4 flex justify-center items-center space-x-4 bg-gray-800">
-        {/* Call State Indicator */}
-        <div className={`px-3 py-1 rounded-lg text-sm font-medium ${
-          callState === 'idle' ? 'bg-gray-600' :
-          callState === 'incoming' ? 'bg-yellow-600' :
-          callState === 'answering' ? 'bg-blue-600' :
-          callState === 'active' ? 'bg-green-600' : 'bg-red-600'
-        }`}>
-          {callState === 'idle' && 'Waiting...'}
-          {callState === 'incoming' && 'Incoming Call'}
-          {callState === 'answering' && 'Connecting...'}
-          {callState === 'active' && 'Connected'}
-          {callState === 'ended' && 'Call Ended'}
+      {/* Main Video Container */}
+      <div className="relative w-full h-full pt-20 pb-24">
+        {/* Remote Video (Main/Large) */}
+        <div className="relative w-full h-full">
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            className="w-full h-full object-cover bg-gray-800"
+            style={{
+              transform: 'scaleX(-1)' // Mirror effect like Zoom
+            }}
+          />
+          
+          {/* Remote Video Overlay Info */}
+          {callState === 'active' && (
+            <div className="absolute bottom-4 left-4 bg-black/50 backdrop-blur-sm rounded-lg px-3 py-2">
+              <div className="text-white text-sm font-medium">
+                {user?.role === 'doctor' ? 'Patient' : 'Dr. ' + (user?.name || 'Doctor')}
+              </div>
+            </div>
+          )}
+
+          {/* Connection Status Overlay */}
+          {callState !== 'active' && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-900/90">
+              <div className="text-center">
+                <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gray-700 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-full bg-gray-600 flex items-center justify-center">
+                    <svg className="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                </div>
+                <h3 className="text-white text-lg font-medium mb-2">
+                  {callState === 'idle' && 'Waiting for connection...'}
+                  {callState === 'incoming' && 'Incoming call'}
+                  {callState === 'answering' && 'Connecting to call...'}
+                  {callState === 'ended' && 'Call has ended'}
+                </h3>
+                <p className="text-gray-400 text-sm">
+                  {callState === 'idle' && 'Please wait while we establish the connection'}
+                  {callState === 'incoming' && 'Auto-answering incoming call...'}
+                  {callState === 'answering' && 'Setting up video and audio...'}
+                  {callState === 'ended' && 'Thank you for using Medi-Mitra'}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
-        {user?.role === "doctor" && (
-          <button
-            onClick={handleDoctorStart}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50"
-            disabled={!resolvedPatientId || callState === 'active'}
-            title={!resolvedPatientId ? "Resolving patient..." : callState === 'active' ? "Call in progress" : "Start Call"}
-          >
-            {callState === 'active' ? 'Call Active' : 'Start Call'}
-          </button>
-        )}
+        {/* Local Video (Picture-in-Picture) */}
+        <div className="absolute top-4 right-4 w-64 h-48 z-20">
+          <div className="relative w-full h-full rounded-xl overflow-hidden shadow-2xl border-2 border-white/20">
+            <video
+              ref={localVideoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover bg-gray-800"
+              style={{
+                transform: 'scaleX(-1)' // Mirror effect
+              }}
+            />
+            
+            {/* Local Video Overlay */}
+            <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm rounded px-2 py-1">
+              <span className="text-white text-xs font-medium">You</span>
+            </div>
 
-        {user?.role === "patient" && callState === "incoming" && (
-          <div className="text-yellow-400 text-sm">
-            Auto-answering incoming call...
+            {/* Muted Indicator */}
+            <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm rounded-full p-1">
+              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.617.82L4.29 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.29l4.093-3.82a1 1 0 011.617.82zM12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </div>
           </div>
-        )}
-
-        {callState === 'active' && (
-          <button
-            onClick={endCall}
-            className="px-6 py-2 bg-red-600 hover:bg-red-700 rounded-lg"
-            title="End Call"
-          >
-            End Call
-          </button>
-        )}
+        </div>
       </div>
+
+      {/* Bottom Control Bar */}
+      <div className="absolute bottom-0 left-0 right-0 z-30 bg-black/30 backdrop-blur-xl border-t border-white/10">
+        <div className="flex items-center justify-center px-8 py-6">
+          <div className="flex items-center space-x-6">
+            
+            {/* Doctor Start Call Button */}
+            {user?.role === "doctor" && callState !== 'active' && (
+              <button
+                onClick={handleDoctorStart}
+                disabled={!resolvedPatientId}
+                className="flex items-center space-x-2 px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-full transition-all duration-200 shadow-lg"
+                title={!resolvedPatientId ? "Loading patient info..." : "Start video call"}
+              >
+                <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
+                </svg>
+                <span className="text-white font-medium">
+                  {!resolvedPatientId ? 'Loading...' : 'Start Call'}
+                </span>
+              </button>
+            )}
+
+            {/* Patient Auto-Answer Indicator */}
+            {user?.role === "patient" && callState === "incoming" && (
+              <div className="flex items-center space-x-2 px-4 py-2 bg-amber-500/20 border border-amber-500/30 rounded-full">
+                <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></div>
+                <span className="text-amber-200 text-sm font-medium">Connecting to call...</span>
+              </div>
+            )}
+
+            {/* Active Call Controls */}
+            {callState === 'active' && (
+              <>
+                {/* Mute Button */}
+                <button className="p-3 bg-gray-700/50 hover:bg-gray-600/50 rounded-full transition-all duration-200 border border-gray-600">
+                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clipRule="evenodd" />
+                  </svg>
+                </button>
+
+                {/* Video Button */}
+                <button className="p-3 bg-gray-700/50 hover:bg-gray-600/50 rounded-full transition-all duration-200 border border-gray-600">
+                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
+                  </svg>
+                </button>
+
+                {/* End Call Button */}
+                <button
+                  onClick={endCall}
+                  className="flex items-center space-x-2 px-6 py-3 bg-red-600 hover:bg-red-700 rounded-full transition-all duration-200 shadow-lg"
+                >
+                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-white font-medium">End Call</span>
+                </button>
+
+                {/* Settings Button */}
+                <button className="p-3 bg-gray-700/50 hover:bg-gray-600/50 rounded-full transition-all duration-200 border border-gray-600">
+                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Connection Quality Indicator */}
+      {callState === 'active' && (
+        <div className="absolute top-24 left-4 z-20 flex items-center space-x-2 bg-black/50 backdrop-blur-sm rounded-lg px-3 py-2">
+          <div className="flex space-x-1">
+            <div className="w-1 h-3 bg-green-500 rounded-full"></div>
+            <div className="w-1 h-3 bg-green-500 rounded-full"></div>
+            <div className="w-1 h-3 bg-green-500 rounded-full"></div>
+            <div className="w-1 h-3 bg-green-300 rounded-full"></div>
+          </div>
+          <span className="text-white text-xs font-medium">Good connection</span>
+        </div>
+      )}
     </div>
   );
 }
