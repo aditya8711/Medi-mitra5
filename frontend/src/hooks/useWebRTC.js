@@ -35,17 +35,11 @@ export default function useWebRTC(user) {
     const createPeerConnection = () => {
       const pc = new RTCPeerConnection({
         iceServers: [
-          // Multiple reliable STUN servers
+          // Use only the most reliable Google STUN servers
           { urls: "stun:stun.l.google.com:19302" },
           { urls: "stun:stun1.l.google.com:19302" },
           { urls: "stun:stun2.l.google.com:19302" },
-          { urls: "stun:stun3.l.google.com:19302" },
-          { urls: "stun:stun4.l.google.com:19302" },
-          // Additional reliable STUN servers
-          { urls: "stun:stun.stunprotocol.org:3478" },
-          { urls: "stun:stun.voiparound.com" },
-          { urls: "stun:stun.voipbuster.com" },
-          // More reliable TURN servers
+          // Reliable TURN server as backup
           {
             urls: "turn:openrelay.metered.ca:80",
             username: "openrelayproject",
