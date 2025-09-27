@@ -35,18 +35,28 @@ export default function useWebRTC(user) {
     const createPeerConnection = () => {
       const pc = new RTCPeerConnection({
         iceServers: [
-          // Use only the most reliable Google STUN servers
+          // Primary Google STUN servers
           { urls: "stun:stun.l.google.com:19302" },
           { urls: "stun:stun1.l.google.com:19302" },
           { urls: "stun:stun2.l.google.com:19302" },
-          // Reliable TURN server as backup
+          { urls: "stun:stun3.l.google.com:19302" },
+          { urls: "stun:stun4.l.google.com:19302" },
+          // Alternative STUN servers for better reliability
+          { urls: "stun:relay.webwormhole.io:3478" },
+          { urls: "stun:stun.nextcloud.com:443" },
+          { urls: "stun:stun.sipnet.net:3478" },
+          { urls: "stun:stun.antisip.com:3478" },
+          // TURN server as backup
           {
             urls: "turn:openrelay.metered.ca:80",
             username: "openrelayproject",
             credential: "openrelayproject"
           }
         ],
-        iceCandidatePoolSize: 10 // Pre-gather candidates for faster connection
+        iceCandidatePoolSize: 10, // Pre-gather candidates for faster connection
+        iceTransportPolicy: 'all', // Use both STUN and TURN
+        bundlePolicy: 'max-bundle', // Bundle all media streams
+        rtcpMuxPolicy: 'require' // Require RTCP multiplexing
       });
 
       // Enhanced connection monitoring
@@ -71,12 +81,33 @@ export default function useWebRTC(user) {
         if (iceState === 'connected' || iceState === 'completed') {
           console.log("🎉 WebRTC call connected successfully! Audio/video should be flowing.");
         } else if (iceState === 'failed') {
-          console.log("❌ ICE connection failed - attempting restart");
-          // Add restart logic if needed
+          console.log("❌ ICE connection failed - attempting ICE restart");
+          // Attempt ICE restart
+          if (pc.restartIce && typeof pc.restartIce === 'function') {
+            try {
+              pc.restartIce();
+              console.log("🔄 ICE restart initiated");
+            } catch (err) {
+              console.error("❌ ICE restart failed:", err);
+            }
+          }
         } else if (iceState === 'checking') {
           console.log("🔍 ICE checking connectivity...");
         } else if (iceState === 'disconnected') {
-          console.log("⚠️ ICE disconnected - may recover automatically");
+          console.log("⚠️ ICE disconnected - monitoring for recovery...");
+          // Set a timeout to attempt restart if it doesn't recover
+          setTimeout(() => {
+            if (pc.iceConnectionState === 'disconnected') {
+              console.log("🔄 ICE still disconnected after 5s - attempting restart");
+              if (pc.restartIce && typeof pc.restartIce === 'function') {
+                try {
+                  pc.restartIce();
+                } catch (err) {
+                  console.error("❌ ICE restart failed:", err);
+                }
+              }
+            }
+          }, 5000);
         } else if (iceState === 'new') {
           console.log("🆕 ICE connection initialized");
         }
@@ -87,13 +118,20 @@ export default function useWebRTC(user) {
         console.log("🧊 ICE Gathering state:", pc.iceGatheringState);
       };
 
+      let stunErrorCount = 0;
       pc.onicecandidateerror = (event) => {
         // Categorize and handle different types of ICE errors
         if (event.url && event.url.includes('turn')) {
           console.warn("⚠️ TURN server unavailable (using STUN fallback):", event.url);
         } else if (event.url && event.url.includes('stun')) {
-          // STUN errors are usually network-related and non-critical if we have multiple servers
+          stunErrorCount++;
           console.log("ℹ️ STUN server issue (backup servers available):", event.url, event.errorText);
+          
+          // If too many STUN failures, suggest direct connection
+          if (stunErrorCount >= 3) {
+            console.warn("⚠️ Multiple STUN failures detected - network may have NAT/firewall restrictions");
+            console.log("💡 Attempting direct peer connection...");
+          }
         } else {
           console.error("❌ ICE candidate error:", event);
         }
