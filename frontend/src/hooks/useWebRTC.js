@@ -365,6 +365,11 @@ export default function useWebRTC(user) {
         setConnectionQuality(s==='completed'?'excellent':'good'); 
         setCallState('active'); 
       }
+      // In classical mode, try ICE restart if failed/disconnected after candidates exchanged
+      else if (CLASSIC_P2P_MODE && s === 'failed' && pc.remoteDescription) {
+        console.log('🔄 Classical mode: Attempting ICE restart for failed connection');
+        pc.restartIce();
+      }
     };
   };
 
@@ -373,9 +378,15 @@ export default function useWebRTC(user) {
     const servers = CLASSIC_P2P_MODE ? (ADD_TURN_BACKUP ? CLASSIC_WITH_TURN : CLASSIC_ICE_SERVERS) : (ICE_STAGES[stage] || ICE_STAGES[ICE_STAGES.length-1]);
     console.log(`🧊 ${CLASSIC_P2P_MODE ? 'Classical' : 'Staged'} PC - ${CLASSIC_P2P_MODE ? (ADD_TURN_BACKUP ? 'STUN+TURN' : 'STUN-only') : 'stage ' + stage}:`, servers.map(s=>s.urls));
     
-    const pc = new RTCPeerConnection({
+    const pc = new RTCPeerConnection(CLASSIC_P2P_MODE ? {
       iceServers: servers,
-      iceCandidatePoolSize: CLASSIC_P2P_MODE ? 0 : (stage === 0 ? 0 : 5),
+      // Ultra-simple config for classical P2P reliability
+      bundlePolicy: 'max-bundle',
+      iceTransportPolicy: 'all',
+      rtcpMuxPolicy: 'require'
+    } : {
+      iceServers: servers,
+      iceCandidatePoolSize: stage === 0 ? 0 : 5,
       bundlePolicy: 'balanced',
       iceTransportPolicy: 'all',
       rtcpMuxPolicy: 'require'
