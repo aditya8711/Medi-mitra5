@@ -115,6 +115,7 @@ export default function useWebRTC(user) {
         console.log("✅ Call connected successfully");
         setConnectionQuality('excellent');
       } else if (state === 'connecting') {
+        console.log("🔗 Connection state: connecting - peer connection establishing...");
         setConnectionQuality('fair');
       } else if (state === 'disconnected') {
         setConnectionQuality('poor');
@@ -140,23 +141,10 @@ export default function useWebRTC(user) {
       } else if (iceState === 'checking') {
         console.log("🔍 Checking connectivity (TURN servers will help if needed)...");
         setConnectionQuality('fair');
-        // Set a shorter timeout for quicker retry
-        connectionTimeout = setTimeout(() => {
-          if (pc.iceConnectionState === 'checking' || pc.iceConnectionState === 'connecting') {
-            console.log("⏱️ Connection timeout - forcing retry...");
-            // Prevent multiple simultaneous retries
-            if (user?.role === 'doctor' && !isRetryingRef.current) {
-              isRetryingRef.current = true;
-              console.log("🔄 Resetting call state and creating fresh connection");
-              resetPeerConnection();
-              setCallState('idle');
-              setTimeout(() => {
-                startCall(remoteUserIdRef.current);
-                isRetryingRef.current = false; // Reset retry flag after attempt
-              }, 1000);
-            }
-          }
-        }, 15000); // Even longer timeout - connection is progressing well
+        // Connection is progressing well - let it complete naturally without timeout interference
+        console.log("🔄 Connection progressing well - allowing natural WebRTC connection process");
+        // Temporarily disabled timeout since connections are reaching connecting state consistently
+        // connectionTimeout = setTimeout(() => { ... }, 25000);
       } else if (iceState === 'failed') {
         console.log("❌ Connection failed");
         if (connectionTimeout) clearTimeout(connectionTimeout);
