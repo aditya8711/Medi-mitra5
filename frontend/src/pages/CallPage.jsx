@@ -194,24 +194,19 @@ export default function CallPage() {
         <div className="flex items-center justify-center px-4 sm:px-8 md:px-12 py-6 sm:py-8 md:py-10 w-full">
           <div className="flex items-center justify-center space-x-4 sm:space-x-6 md:space-x-8 lg:space-x-12 max-w-full overflow-x-auto">
             
-            {/* DOCTOR START CALL BUTTON - LARGE SIZE FOR TABLETS */}
+            {/* Doctor Start Call Button - Smaller for tablets */}
             {user?.role === "doctor" && callState !== 'active' && (
               <button
                 onClick={handleDoctorStart}
                 disabled={!resolvedPatientId}
-                className="flex items-center justify-center space-x-3 px-6 md:px-8 lg:px-12 py-4 md:py-6 lg:py-8 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-2xl md:rounded-3xl transition-all duration-200 shadow-2xl text-base md:text-lg lg:text-xl font-bold border-4 border-green-400"
+                className="flex items-center space-x-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg transition-all duration-200 shadow-lg text-sm font-medium border border-green-400"
                 title={!resolvedPatientId ? "Loading patient info..." : "Start video call"}
-                style={{
-                  minHeight: '70px',
-                  minWidth: '200px',
-                  fontSize: '18px'
-                }}
               >
-                <svg className="w-6 h-6 md:w-8 md:h-8 lg:w-10 lg:h-10 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
                 </svg>
-                <span className="text-white font-bold">
-                  {!resolvedPatientId ? 'Loading Patient...' : '📞 START VIDEO CALL'}
+                <span className="text-white">
+                  {!resolvedPatientId ? 'Loading...' : 'Start Call'}
                 </span>
               </button>
             )}
