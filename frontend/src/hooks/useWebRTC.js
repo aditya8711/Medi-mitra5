@@ -5,6 +5,7 @@ import { getSocket } from "../utils/socket";
 export default function useWebRTC(user) {
   const [incomingOffer, setIncomingOffer] = useState(null);
   const [callState, setCallState] = useState('idle'); // idle, incoming, answering, active, ended
+  const [connectionQuality, setConnectionQuality] = useState('unknown'); // unknown, poor, good, excellent
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -20,11 +21,11 @@ export default function useWebRTC(user) {
   const createPeerConnection = () => {
     const pc = new RTCPeerConnection({
       iceServers: [
-        // Google STUN servers
+        // Primary STUN servers (most reliable)
         { urls: "stun:stun.l.google.com:19302" },
         { urls: "stun:stun1.l.google.com:19302" },
         
-        // Free TURN servers for NAT traversal
+        // Primary TURN servers (working well based on logs)
         {
           urls: "turn:openrelay.metered.ca:80",
           username: "openrelayproject",
@@ -35,35 +36,36 @@ export default function useWebRTC(user) {
           username: "openrelayproject", 
           credential: "openrelayproject"
         },
-        {
-          urls: "turns:openrelay.metered.ca:443?transport=tcp",
-          username: "openrelayproject",
-          credential: "openrelayproject"
-        },
         
-        // Additional free TURN server
+        // Backup TURN servers
         {
-          urls: "turn:freeturn.net:3478",
-          username: "free",
-          credential: "free"
-        },
-        {
-          urls: "turn:freeturn.tel:3478",
-          username: "free", 
-          credential: "free"
+          urls: "turn:numb.viagenie.ca:3478",
+          username: "webrtc@live.com",
+          credential: "muazkh"
         }
       ],
       iceCandidatePoolSize: 0, // Disable pre-gathering to reduce candidate flood
-      iceTransportPolicy: 'all' // Allow both relay and direct connections
+      iceTransportPolicy: 'all', // Allow both relay and direct connections
+      bundlePolicy: 'max-bundle',
+      rtcpMuxPolicy: 'require'
     });
 
-    // Simple connection monitoring
+    // Enhanced connection monitoring with quality tracking
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
+      console.log('🔗 Connection state changed to:', state);
+      
       if (state === 'connected') {
         console.log("✅ Call connected successfully");
+        setConnectionQuality('excellent');
+      } else if (state === 'connecting') {
+        setConnectionQuality('fair');
+      } else if (state === 'disconnected') {
+        setConnectionQuality('poor');
+        console.log("🔄 Connection disconnected, attempting recovery...");
       } else if (state === 'failed') {
         console.log("❌ Connection failed");
+        setConnectionQuality('poor');
       }
     };
 
@@ -74,9 +76,12 @@ export default function useWebRTC(user) {
       
       if (iceState === 'connected' || iceState === 'completed') {
         console.log("✅ WebRTC connected successfully!");
+        setConnectionQuality(iceState === 'completed' ? 'excellent' : 'good');
+        setCallState('active');
         if (connectionTimeout) clearTimeout(connectionTimeout);
       } else if (iceState === 'checking') {
         console.log("🔍 Checking connectivity (TURN servers will help if needed)...");
+        setConnectionQuality('fair');
         // Set a timeout for connection attempts
         connectionTimeout = setTimeout(() => {
           if (pc.iceConnectionState === 'checking') {
@@ -84,8 +89,34 @@ export default function useWebRTC(user) {
           }
         }, 15000); // Increased timeout for TURN relay
       } else if (iceState === 'failed') {
-        console.log("❌ Connection failed - both peers likely behind NAT/firewall");
+        console.log("❌ Connection failed - attempting ICE restart with TURN servers...");
         if (connectionTimeout) clearTimeout(connectionTimeout);
+        
+        // Attempt ICE restart for better connectivity
+        if (pc.restartIce && typeof pc.restartIce === 'function') {
+          try {
+            pc.restartIce();
+            console.log("🔄 ICE restart initiated - trying different TURN paths");
+          } catch (err) {
+            console.error("❌ ICE restart failed:", err);
+          }
+        }
+      } else if (iceState === 'disconnected') {
+        console.log("⚠️ Connection disconnected - will attempt recovery");
+        
+        // Set timeout for automatic recovery attempt
+        setTimeout(() => {
+          if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+            console.log("🔄 Attempting automatic reconnection...");
+            if (pc.restartIce && typeof pc.restartIce === 'function') {
+              try {
+                pc.restartIce();
+              } catch (err) {
+                console.error("❌ Auto-reconnection failed:", err);
+              }
+            }
+          }
+        }, 3000);
       }
     };
 
@@ -545,5 +576,5 @@ export default function useWebRTC(user) {
     console.log("✅ Call cleanup completed");
   };
 
-  return { localVideoRef, remoteVideoRef, startCall, answerCall, incomingOffer, callState, endCall };
+  return { localVideoRef, remoteVideoRef, startCall, answerCall, incomingOffer, callState, endCall, connectionQuality };
 }
