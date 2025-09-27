@@ -25,8 +25,14 @@ export default function useWebRTC(user) {
       pcRef.current.close();
     }
     
-    // Create a fresh peer connection
-    pcRef.current = retryCountRef.current >= 2 ? createSimplePeerConnection() : createPeerConnection();
+    // Create a fresh peer connection with progressive simplification
+    if (retryCountRef.current >= 3) {
+      pcRef.current = createUltraSimplePeerConnection();
+    } else if (retryCountRef.current >= 2) {
+      pcRef.current = createSimplePeerConnection();
+    } else {
+      pcRef.current = createPeerConnection();
+    }
     
     // Setup handlers
     pcRef.current.ontrack = (event) => {
@@ -44,7 +50,23 @@ export default function useWebRTC(user) {
       }
     };
     
-    console.log("🔄 Peer connection reset for retry", retryCountRef.current >= 2 ? "(simplified)" : "(enhanced)");
+    const connectionType = retryCountRef.current >= 3 ? "(ultra-simple)" : 
+                          retryCountRef.current >= 2 ? "(simplified)" : "(enhanced)";
+    console.log("🔄 Peer connection reset for retry", connectionType);
+  };
+
+  // Helper function to create ultra-simple peer connection for restrictive networks
+  const createUltraSimplePeerConnection = () => {
+    console.log("🔄 Creating ultra-simple peer connection (direct only)");
+    return new RTCPeerConnection({
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" }
+      ],
+      iceCandidatePoolSize: 0,
+      iceTransportPolicy: 'all',
+      bundlePolicy: 'max-compat',
+      rtcpMuxPolicy: 'negotiate'
+    });
   };
 
   // Helper function to create peer connection with enhanced configuration
@@ -150,9 +172,9 @@ export default function useWebRTC(user) {
         if (connectionTimeout) clearTimeout(connectionTimeout);
         
         retryCountRef.current += 1;
-        console.log(`🔄 Attempting reconnection (attempt ${retryCountRef.current}/3)...`);
+        console.log(`🔄 Attempting reconnection (attempt ${retryCountRef.current}/5)...`);
         
-        if (retryCountRef.current <= 3 && !isRetryingRef.current) {
+        if (retryCountRef.current <= 5 && !isRetryingRef.current) {
           setTimeout(() => {
             if (user?.role === 'doctor' && callState !== 'active' && !isRetryingRef.current) {
               isRetryingRef.current = true;
@@ -163,9 +185,9 @@ export default function useWebRTC(user) {
                 isRetryingRef.current = false;
               }, 500);
             }
-          }, 1000 * retryCountRef.current); // Progressive delay
+          }, 2000); // Fixed 2-second delay for failed connections
         } else {
-          console.log("❌ Max retries reached - connection may not be possible");
+          console.log("❌ Max retries reached (5 attempts) - connection may not be possible");
           setConnectionQuality('poor');
         }
       } else if (iceState === 'disconnected') {
@@ -291,7 +313,113 @@ export default function useWebRTC(user) {
       console.log("📥 Answer details:", {
         hasAnswer: !!payload?.answer,
         from: payload?.from,
-        answerType: payload?.answer?.type,
+        answerType: payloa🔌 Creating socket connection: {url: 'https://medi-mitra-2t5i.onrender.com', hasAuthToken: true, authToken: 'eyJhbGciOi...'}
+index-Cit2knNH.js:155 ✅ Shared socket connected: 1JzHwYvTvoc71swgAAK6
+index-Cit2knNH.js:173 📞 Incoming call notification received: {from: '68d7ca7d958fcc64b35b2ddf', fromUserName: 'David', appointmentId: '68d7ca93958fcc64b35b2deb', timestamp: 1758983467919, type: 'call-notification'}
+index-Cit2knNH.js:173 📞 Notification details: {hasData: true, from: '68d7ca7d958fcc64b35b2ddf', appointmentId: '68d7ca93958fcc64b35b2deb', userRole: 'patient', socketConnected: true, …}
+index-Cit2knNH.js:173 🚫 Ignoring duplicate call notification - already in state: incoming
+index-Cit2knNH.js:173 ✅ Accepting call for appointment: 68d7ca93958fcc64b35b2deb
+index-Cit2knNH.js:159 🔌 WebRTC Hook initialized: {socketConnected: true, userId: undefined, userRole: 'patient', socketId: '1JzHwYvTvoc71swgAAK6'}
+index-Cit2knNH.js:159 📥 Incoming Offer: {offer: {…}, from: '68d7ca7d958fcc64b35b2ddf'}
+index-Cit2knNH.js:159 📥 Offer details: {hasOffer: true, from: '68d7ca7d958fcc64b35b2ddf', offerType: 'offer', socketConnected: true, currentCallState: 'idle', …}
+index-Cit2knNH.js:159 📥 Incoming ICE Candidate: {candidate: {…}, from: '68d7ca7d958fcc64b35b2ddf'}
+index-Cit2knNH.js:159  📥 ICE details: {hasCandidate: true, from: '68d7ca7d958fcc64b35b2ddf', candidateType: 'candidate:1643500627 1 udp 2122260224 172.20.80.1 ...', socketConnected: true, totalProcessed: 1}
+index-Cit2knNH.js:159 📦 Remote description not set yet - candidate will be queued by browser
+index-Cit2knNH.js:159 📥 Incoming ICE Candidate: {candidate: {…}, from: '68d7ca7d958fcc64b35b2ddf'}
+index-Cit2knNH.js:159  📥 ICE details: {hasCandidate: true, from: '68d7ca7d958fcc64b35b2ddf', candidateType: 'candidate:3799047397 1 udp 2122063616 192.168.137....', socketConnected: true, totalProcessed: 2}
+index-Cit2knNH.js:159 📦 Remote description not set yet - candidate will be queued by browser
+index-Cit2knNH.js:159 📥 Incoming ICE Candidate: {candidate: {…}, from: '68d7ca7d958fcc64b35b2ddf'}
+index-Cit2knNH.js:159  📥 ICE details: {hasCandidate: true, from: '68d7ca7d958fcc64b35b2ddf', candidateType: 'candidate:1295662555 1 udp 1685856000 58.84.20.98 ...', socketConnected: true, totalProcessed: 3}
+index-Cit2knNH.js:159 📦 Remote description not set yet - candidate will be queued by browser
+index-Cit2knNH.js:159 🏥 Patient on call page - attempting to answer: {hasIncomingOffer: true, incomingOffer: {…}, userRole: 'patient', appointmentId: '68d7ca93958fcc64b35b2deb', callState: 'incoming'}
+index-Cit2knNH.js:159 📞 Starting answer process - PC state: stable
+index-Cit2knNH.js:159 📥 Incoming ICE Candidate: {candidate: {…}, from: '68d7ca7d958fcc64b35b2ddf'}
+index-Cit2knNH.js:159  📥 ICE details: {hasCandidate: true, from: '68d7ca7d958fcc64b35b2ddf', candidateType: 'candidate:2861804063 1 udp 2121998080 172.16.224.1...', socketConnected: true, totalProcessed: 4}
+index-Cit2knNH.js:159 📦 Remote description not set yet - candidate will be queued by browser
+index-Cit2knNH.js:159 📥 Incoming ICE Candidate: {candidate: {…}, from: '68d7ca7d958fcc64b35b2ddf'}
+index-Cit2knNH.js:159  📥 ICE details: {hasCandidate: true, from: '68d7ca7d958fcc64b35b2ddf', candidateType: 'candidate:1801321813 1 udp 1685790464 58.84.20.98 ...', socketConnected: true, totalProcessed: 5}
+index-Cit2knNH.js:159 📦 Remote description not set yet - candidate will be queued by browser
+index-Cit2knNH.js:159 ✅ Remote description set, PC state now: have-remote-offer
+index-Cit2knNH.js:159 📥 Incoming ICE Candidate: {candidate: {…}, from: '68d7ca7d958fcc64b35b2ddf'}
+index-Cit2knNH.js:159  📥 ICE details: {hasCandidate: true, from: '68d7ca7d958fcc64b35b2ddf', candidateType: 'candidate:3617375957 1 udp 2122199808 fd00::8b1:e3...', socketConnected: true, totalProcessed: 6}
+index-Cit2knNH.js:159 ✅ ICE candidate added successfully
+index-Cit2knNH.js:159 📥 Incoming ICE Candidate: {candidate: {…}, from: '68d7ca7d958fcc64b35b2ddf'}
+index-Cit2knNH.js:159  📥 ICE details: {hasCandidate: true, from: '68d7ca7d958fcc64b35b2ddf', candidateType: 'candidate:2269554326 1 udp 2122134272 fd00::ec5d:8...', socketConnected: true, totalProcessed: 7}
+index-Cit2knNH.js:159 📥 Incoming ICE Candidate: {candidate: {…}, from: '68d7ca7d958fcc64b35b2ddf'}
+index-Cit2knNH.js:159  📥 ICE details: {hasCandidate: true, from: '68d7ca7d958fcc64b35b2ddf', candidateType: 'candidate:523908811 1 tcp 1518280448 172.20.80.1 9...', socketConnected: true, totalProcessed: 8}
+index-Cit2knNH.js:159 📥 Incoming ICE Candidate: {candidate: {…}, from: '68d7ca7d958fcc64b35b2ddf'}
+index-Cit2knNH.js:159  📥 ICE details: {hasCandidate: true, from: '68d7ca7d958fcc64b35b2ddf', candidateType: 'candidate:2629779069 1 tcp 1518083840 192.168.137....', socketConnected: true, totalProcessed: 9}
+index-Cit2knNH.js:159 📥 Incoming ICE Candidate: {candidate: {…}, from: '68d7ca7d958fcc64b35b2ddf'}
+index-Cit2knNH.js:159  📥 ICE details: {hasCandidate: true, from: '68d7ca7d958fcc64b35b2ddf', candidateType: 'candidate:3562817671 1 tcp 1518018304 172.16.224.1...', socketConnected: true, totalProcessed: 10}
+index-Cit2knNH.js:159 📥 Incoming ICE Candidate: {candidate: {…}, from: '68d7ca7d958fcc64b35b2ddf'}
+index-Cit2knNH.js:159  📥 ICE details: {hasCandidate: true, from: '68d7ca7d958fcc64b35b2ddf', candidateType: 'candidate:2840798285 1 tcp 1518220032 fd00::8b1:e3...', socketConnected: true, totalProcessed: 11}
+index-Cit2knNH.js:159 📥 Incoming ICE Candidate: {candidate: {…}, from: '68d7ca7d958fcc64b35b2ddf'}
+index-Cit2knNH.js:159  📥 ICE details: {hasCandidate: true, from: '68d7ca7d958fcc64b35b2ddf', candidateType: 'candidate:4186522638 1 tcp 1518154496 fd00::ec5d:8...', socketConnected: true, totalProcessed: 12}
+index-Cit2knNH.js:159 📥 Incoming ICE Candidate: {candidate: {…}, from: '68d7ca7d958fcc64b35b2ddf'}
+index-Cit2knNH.js:159  📥 ICE details: {hasCandidate: true, from: '68d7ca7d958fcc64b35b2ddf', candidateType: 'candidate:1643500627 1 udp 2122260224 172.20.80.1 ...', socketConnected: true, totalProcessed: 13}
+index-Cit2knNH.js:159 📥 Incoming ICE Candidate: {candidate: {…}, from: '68d7ca7d958fcc64b35b2ddf'}
+index-Cit2knNH.js:159  📥 ICE details: {hasCandidate: true, from: '68d7ca7d958fcc64b35b2ddf', candidateType: 'candidate:3799047397 1 udp 2122063616 192.168.137....', socketConnected: true, totalProcessed: 14}
+index-Cit2knNH.js:159 📥 Incoming ICE Candidate: {candidate: {…}, from: '68d7ca7d958fcc64b35b2ddf'}
+index-Cit2knNH.js:159  📥 ICE details: {hasCandidate: true, from: '68d7ca7d958fcc64b35b2ddf', candidateType: 'candidate:1295662555 1 udp 1685856000 58.84.20.98 ...', socketConnected: true, totalProcessed: 15}
+index-Cit2knNH.js:159 📥 Incoming ICE Candidate: {candidate: {…}, from: '68d7ca7d958fcc64b35b2ddf'}
+index-Cit2knNH.js:159  📥 ICE details: {hasCandidate: true, from: '68d7ca7d958fcc64b35b2ddf', candidateType: 'candidate:2861804063 1 udp 2121998080 172.16.224.1...', socketConnected: true, totalProcessed: 16}
+index-Cit2knNH.js:159 📥 Incoming ICE Candidate: {candidate: {…}, from: '68d7ca7d958fcc64b35b2ddf'}
+index-Cit2knNH.js:159  📥 ICE details: {hasCandidate: true, from: '68d7ca7d958fcc64b35b2ddf', candidateType: 'candidate:1801321813 1 udp 1685790464 58.84.20.98 ...', socketConnected: true, totalProcessed: 17}
+index-Cit2knNH.js:159 📥 Incoming ICE Candidate: {candidate: {…}, from: '68d7ca7d958fcc64b35b2ddf'}
+index-Cit2knNH.js:159  📥 ICE details: {hasCandidate: true, from: '68d7ca7d958fcc64b35b2ddf', candidateType: 'candidate:3617375957 1 udp 2122199808 fd00::8b1:e3...', socketConnected: true, totalProcessed: 18}
+index-Cit2knNH.js:159 📥 Incoming ICE Candidate: {candidate: {…}, from: '68d7ca7d958fcc64b35b2ddf'}
+index-Cit2knNH.js:159  📥 ICE details: {hasCandidate: true, from: '68d7ca7d958fcc64b35b2ddf', candidateType: 'candidate:2269554326 1 udp 2122134272 fd00::ec5d:8...', socketConnected: true, totalProcessed: 19}
+index-Cit2knNH.js:159 📥 Incoming ICE Candidate: {candidate: {…}, from: '68d7ca7d958fcc64b35b2ddf'}
+index-Cit2knNH.js:159   Skipping duplicate ICE candidate: 68d7ca7d958fcc64b35b2ddf-candidate:523908811 1 tcp...
+index-Cit2knNH.js:159 📥 Incoming ICE Candidate: {candidate: {…}, from: '68d7ca7d958fcc64b35b2ddf'}
+index-Cit2knNH.js:159   Skipping duplicate ICE candidate: 68d7ca7d958fcc64b35b2ddf-candidate:2629779069 1 tc...
+13index-Cit2knNH.js:159 ✅ ICE candidate added successfully
+index-Cit2knNH.js:159 📥 Incoming ICE Candidate: {candidate: {…}, from: '68d7ca7d958fcc64b35b2ddf'}
+index-Cit2knNH.js:159   Skipping duplicate ICE candidate: 68d7ca7d958fcc64b35b2ddf-candidate:3562817671 1 tc...
+index-Cit2knNH.js:159 📥 Incoming ICE Candidate: {candidate: {…}, from: '68d7ca7d958fcc64b35b2ddf'}
+index-Cit2knNH.js:159   Skipping duplicate ICE candidate: 68d7ca7d958fcc64b35b2ddf-candidate:2840798285 1 tc...
+index-Cit2knNH.js:159 📥 Incoming ICE Candidate: {candidate: {…}, from: '68d7ca7d958fcc64b35b2ddf'}
+index-Cit2knNH.js:159   Skipping duplicate ICE candidate: 68d7ca7d958fcc64b35b2ddf-candidate:4186522638 1 tc...
+index-Cit2knNH.js:159 📤 Sent Answer: {sdp: 'v=0\r\no=- 2090763403144996728 2 IN IP4 127.0.0.1\r\ns…q0GMN\r\na=ssrc:3614546164 cname:An4BHdTvNzSq0GMN\r\n', type: 'answer'}
+index-Cit2knNH.js:159 ✅ Call answered successfully for session: 68d7ca7d958fcc64b35b2ddf-1758983466992
+index-Cit2knNH.js:159 🧊 ICE Connection state: checking
+index-Cit2knNH.js:159 🔍 Checking connectivity (TURN servers will help if needed)...
+index-Cit2knNH.js:159 🔄 Connection progressing well - allowing natural WebRTC connection process
+index-Cit2knNH.js:159 ℹ ICE server issue: stun:openrelay.metered.ca:80
+index-Cit2knNH.js:159 ℹ ICE server issue: stun:openrelay.metered.ca:443
+index-Cit2knNH.js:159 ℹ ICE server issue: stun:stun.l.google.com:19302
+index-Cit2knNH.js:159 ℹ ICE server issue: stun:stun2.l.google.com:19302
+index-Cit2knNH.js:159 ℹ ICE server issue: stun:stun1.l.google.com:19302
+index-Cit2knNH.js:159 🔗 Connection state changed to: connecting
+index-Cit2knNH.js:159 🔗 Connection state: connecting - peer connection establishing...
+index-Cit2knNH.js:159 🔄 TURN server attempting relay: turn:openrelay.metered.ca:80?transport=udp
+index-Cit2knNH.js:159 🔄 TURN server attempting relay: turn:openrelay.metered.ca:443?transport=udp
+2index-Cit2knNH.js:159 🔄 TURN server attempting relay: turn:openrelay.metered.ca:443?transport=tcp
+2index-Cit2knNH.js:159 🔄 TURN server attempting relay: turn:openrelay.metered.ca:80?transport=tcp
+index-Cit2knNH.js:159 🔄 TURN server attempting relay: stun:coturn.sua.io:3478
+index-Cit2knNH.js:159 🔄 TURN server attempting relay: turn:coturn.sua.io:3478?transport=udp
+index-Cit2knNH.js:159 ℹ ICE server issue: stun:numb.viagenie.ca:3478
+index-Cit2knNH.js:159 🔄 TURN server attempting relay: turn:numb.viagenie.ca:3478?transport=udp
+index-Cit2knNH.js:159 🔄 TURN server attempting relay: stun:turnserver.stunprotocol.org:3478
+index-Cit2knNH.js:159 🔄 TURN server attempting relay: turn:turnserver.stunprotocol.org:3478?transport=udp
+index-Cit2knNH.js:159 ℹ ICE server issue: stun:numb.viagenie.ca:3478
+index-Cit2knNH.js:159 🔄 TURN server attempting relay: turn:numb.viagenie.ca:3478?transport=udp
+index-Cit2knNH.js:159 🔄 TURN server attempting relay: stun:turnserver.stunprotocol.org:3478
+index-Cit2knNH.js:159 🔄 TURN server attempting relay: turn:turnserver.stunprotocol.org:3478?transport=udp
+index-Cit2knNH.js:159 🔄 TURN server attempting relay: stun:coturn.sua.io:3478
+index-Cit2knNH.js:159 🔄 TURN server attempting relay: turn:coturn.sua.io:3478?transport=udp
+2index-Cit2knNH.js:159 🔄 TURN server attempting relay: turn:numb.viagenie.ca:3478?transport=tcp
+2index-Cit2knNH.js:159 🔄 TURN server attempting relay: turns:coturn.sua.io:5349?transport=tcp
+index-Cit2knNH.js:159 🧊 ICE Connection state: disconnected
+index-Cit2knNH.js:159 ⚠ Connection disconnected - will attempt recovery
+index-Cit2knNH.js:159 🔗 Connection state changed to: failed
+index-Cit2knNH.js:159 ❌ Connection failed
+index-Cit2knNH.js:159 🔄 Attempting automatic reconnection...
+index-Cit2knNH.js:159 ℹ ICE server issue: stun:openrelay.metered.ca:80
+index-Cit2knNH.js:159 ℹ ICE server issue: stun:openrelay.metered.ca:443
+index-Cit2knNH.js:159 🔄 TURN server attempting relay: turn:openrelay.metered.ca:80?transport=udp
+index-Cit2knNH.js:159 🔄 TURN server attempting relay: turn:openrelay.metered.ca:443?transport=udp
+index-Cit2knNH.js:159 ✅ ICE gathering completed?.answer?.type,
         socketConnected: socketRef.current?.connected,
         currentCallState: callState,
         pcState: pcRef.current?.signalingState
