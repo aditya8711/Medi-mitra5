@@ -13,6 +13,8 @@ export default function useWebRTC(user) {
   const localStreamRef = useRef(null);
   const remoteUserIdRef = useRef(null);
   const answeredOfferRef = useRef(null); // Track which offer we've answered
+  const processedCandidates = useRef(new Set()); // Track processed ICE candidates
+  const callSessionRef = useRef(null); // Track active call sessions
 
   useEffect(() => {
     socketRef.current = getSocket();
@@ -29,26 +31,63 @@ export default function useWebRTC(user) {
       console.log("📝 Registered user with socket:", user._id);
     }
 
-    // Create RTCPeerConnection
-    pcRef.current = new RTCPeerConnection({
-      iceServers: [
-        // STUN
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" },
-        // TURN fallback (public/demo). Replace with your managed TURN for production.
-        // Example: OpenRelayProject (usage limits apply)
-        // Username and credential are public demo creds; for hackathon reliability only.
-        {
-          urls: [
-            "turn:openrelay.metered.ca:80",
-            "turn:openrelay.metered.ca:443",
-            "turns:openrelay.metered.ca:443?transport=tcp"
-          ],
-          username: "openrelayproject",
-          credential: "openrelayproject"
+    // Helper function to create peer connection with enhanced configuration
+    const createPeerConnection = () => {
+      const pc = new RTCPeerConnection({
+        iceServers: [
+          // Multiple STUN servers for better reliability
+          { urls: "stun:stun.l.google.com:19302" },
+          { urls: "stun:stun1.l.google.com:19302" },
+          { urls: "stun:stun2.l.google.com:19302" },
+          // TURN fallback (public/demo). Replace with your managed TURN for production.
+          {
+            urls: [
+              "turn:openrelay.metered.ca:80",
+              "turn:openrelay.metered.ca:443",
+              "turns:openrelay.metered.ca:443?transport=tcp"
+            ],
+            username: "openrelayproject",
+            credential: "openrelayproject"
+          }
+        ],
+        iceCandidatePoolSize: 10 // Pre-gather candidates for faster connection
+      });
+
+      // Enhanced connection monitoring
+      pc.onconnectionstatechange = () => {
+        const state = pc.connectionState;
+        console.log("🔗 Connection state changed:", state);
+        
+        if (state === 'connected') {
+          console.log("✅ WebRTC connection established successfully");
+        } else if (state === 'failed') {
+          console.log("❌ Connection failed - connection lost");
+          // Could implement reconnection logic here
+        } else if (state === 'disconnected') {
+          console.log("⚠️ Connection disconnected - attempting to reconnect");
         }
-      ],
-    });
+      };
+
+      pc.oniceconnectionstatechange = () => {
+        const iceState = pc.iceConnectionState;
+        console.log("🧊 ICE Connection state:", iceState);
+        
+        if (iceState === 'connected' || iceState === 'completed') {
+          console.log("✅ ICE connection established");
+        } else if (iceState === 'failed') {
+          console.log("❌ ICE connection failed");
+        }
+      };
+
+      pc.onicecandidateerror = (event) => {
+        console.error("❌ ICE candidate error:", event);
+      };
+
+      return pc;
+    };
+
+    // Create RTCPeerConnection
+    pcRef.current = createPeerConnection();
 
     // When remote track arrives, attach it to remote video
     pcRef.current.ontrack = (event) => {
@@ -73,23 +112,39 @@ export default function useWebRTC(user) {
     // Incoming offer: payload shape { offer, from }
     const handleOffer = async (payload) => {
       console.log("📥 Incoming Offer:", payload);
+      
+      if (!payload?.offer) {
+        console.log("❌ Invalid offer - missing offer data");
+        return;
+      }
+
+      const sessionId = `${payload.from}-${Date.now()}`;
+      
       console.log("📥 Offer details:", {
         hasOffer: !!payload?.offer,
         from: payload?.from,
         offerType: payload?.offer?.type,
         socketConnected: socketRef.current?.connected,
         currentCallState: callState,
-        pcState: pcRef.current?.signalingState
+        pcState: pcRef.current?.signalingState,
+        activeSession: callSessionRef.current,
+        newSessionId: sessionId
       });
-      
-      if (!payload?.offer) return;
       
       // Check if we've already processed this offer or are in an active call
       if (answeredOfferRef.current === payload.from || callState === 'answering' || callState === 'active') {
         console.log("🚫 Ignoring duplicate or invalid offer - already in call state:", callState);
         return;
       }
+
+      // Prevent processing if we have an active session with different caller
+      if (callSessionRef.current && callState !== 'idle') {
+        console.log("🚫 Ignoring offer - active session exists:", callSessionRef.current);
+        return;
+      }
       
+      // Set the new session
+      callSessionRef.current = sessionId;
       remoteUserIdRef.current = payload.from || null;
       setCallState('incoming');
       setIncomingOffer(payload);
@@ -122,21 +177,43 @@ export default function useWebRTC(user) {
     // Incoming ICE: payload shape { candidate, from }
     const handleIce = async (payload) => {
       console.log("📥 Incoming ICE Candidate:", payload);
-      console.log("📥 ICE details:", {
+      
+      if (!payload?.candidate) {
+        console.log("❌ Invalid ICE candidate - missing candidate data");
+        return;
+      }
+
+      // Create a unique identifier for the candidate to prevent duplicates
+      const candidateId = `${payload.from}-${payload.candidate.candidate}`;
+      
+      if (processedCandidates.current.has(candidateId)) {
+        console.log("� Skipping duplicate ICE candidate:", candidateId.substring(0, 50) + "...");
+        return;
+      }
+      
+      processedCandidates.current.add(candidateId);
+      
+      console.log("�📥 ICE details:", {
         hasCandidate: !!payload?.candidate,
         from: payload?.from,
-        candidateType: payload?.candidate?.candidate,
-        socketConnected: socketRef.current?.connected
+        candidateType: payload?.candidate?.candidate?.substring(0, 50) + "...",
+        socketConnected: socketRef.current?.connected,
+        totalProcessed: processedCandidates.current.size
       });
+      
       try {
-        if (pcRef.current && payload?.candidate) {
+        if (pcRef.current && pcRef.current.remoteDescription) {
           await pcRef.current.addIceCandidate(
             new RTCIceCandidate(payload.candidate)
           );
           console.log("✅ ICE candidate added successfully");
+        } else {
+          console.log("📦 Remote description not set yet - candidate will be queued by browser");
         }
       } catch (err) {
         console.error("❌ Error adding ICE candidate:", err);
+        // Remove from processed set if it failed to add
+        processedCandidates.current.delete(candidateId);
       }
     };
 
@@ -160,6 +237,8 @@ export default function useWebRTC(user) {
       setCallState('idle');
       setIncomingOffer(null);
       answeredOfferRef.current = null;
+      callSessionRef.current = null;
+      processedCandidates.current.clear();
     };
   }, [user]);
 
@@ -313,6 +392,7 @@ export default function useWebRTC(user) {
         });
 
         console.log("📤 Sent Answer:", answer);
+        console.log("✅ Call answered successfully for session:", callSessionRef.current);
         setCallState('active');
         setIncomingOffer(null); // Clear the offer after answering
       } else {
@@ -326,7 +406,7 @@ export default function useWebRTC(user) {
   };
 
   const endCall = () => {
-    console.log("📞 Ending call");
+    console.log("📞 Ending call - cleaning up session:", callSessionRef.current);
     
     // Stop local stream
     if (localStreamRef.current) {
@@ -337,22 +417,8 @@ export default function useWebRTC(user) {
     // Close peer connection
     if (pcRef.current) {
       pcRef.current.close();
-      // Create new peer connection for future calls
-      pcRef.current = new RTCPeerConnection({
-        iceServers: [
-          { urls: "stun:stun.l.google.com:19302" },
-          { urls: "stun:stun1.l.google.com:19302" },
-          {
-            urls: [
-              "turn:openrelay.metered.ca:80",
-              "turn:openrelay.metered.ca:443",
-              "turns:openrelay.metered.ca:443?transport=tcp"
-            ],
-            username: "openrelayproject",
-            credential: "openrelayproject"
-          }
-        ],
-      });
+      // Create new peer connection for future calls using our enhanced setup
+      pcRef.current = createPeerConnection();
       
       // Re-setup event handlers
       pcRef.current.ontrack = (event) => {
@@ -371,15 +437,19 @@ export default function useWebRTC(user) {
       };
     }
     
-    // Reset state
+    // Reset all state and tracking
     setCallState('idle');
     setIncomingOffer(null);
     answeredOfferRef.current = null;
     remoteUserIdRef.current = null;
+    callSessionRef.current = null; // Reset session tracking
+    processedCandidates.current.clear(); // Clear processed candidates cache
     
     // Clear video elements
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+    
+    console.log("✅ Call cleanup completed");
   };
 
   return { localVideoRef, remoteVideoRef, startCall, answerCall, incomingOffer, callState, endCall };
