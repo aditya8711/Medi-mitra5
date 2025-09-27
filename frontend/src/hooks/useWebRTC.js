@@ -16,6 +16,64 @@ export default function useWebRTC(user) {
   const processedCandidates = useRef(new Set()); // Track processed ICE candidates
   const callSessionRef = useRef(null); // Track active call sessions
 
+  // Helper function to create peer connection with enhanced configuration
+  const createPeerConnection = () => {
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        // Use only the most reliable servers
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" }
+      ],
+      iceCandidatePoolSize: 0, // Disable pre-gathering to reduce candidate flood
+      iceTransportPolicy: 'all' // Allow both relay and direct connections
+    });
+
+    // Simple connection monitoring
+    pc.onconnectionstatechange = () => {
+      const state = pc.connectionState;
+      if (state === 'connected') {
+        console.log("✅ Call connected successfully");
+      } else if (state === 'failed') {
+        console.log("❌ Connection failed");
+      }
+    };
+
+    let connectionTimeout;
+    pc.oniceconnectionstatechange = () => {
+      const iceState = pc.iceConnectionState;
+      console.log("🧊 ICE Connection state:", iceState);
+      
+      if (iceState === 'connected' || iceState === 'completed') {
+        console.log("✅ WebRTC connected successfully!");
+        if (connectionTimeout) clearTimeout(connectionTimeout);
+      } else if (iceState === 'checking') {
+        // Set a timeout for connection attempts
+        connectionTimeout = setTimeout(() => {
+          if (pc.iceConnectionState === 'checking') {
+            console.log("⏱️ Connection timeout - both peers may be behind NAT");
+          }
+        }, 10000);
+      } else if (iceState === 'failed') {
+        console.log("❌ Connection failed - both peers likely behind NAT/firewall");
+        if (connectionTimeout) clearTimeout(connectionTimeout);
+      }
+    };
+
+    // Simple ICE gathering monitoring
+    pc.onicegatheringstatechange = () => {
+      if (pc.iceGatheringState === 'complete') {
+        console.log("✅ ICE gathering complete");
+      }
+    };
+
+    // Simplified error handling - only log critical errors
+    pc.onicecandidateerror = (event) => {
+      console.log("ℹ️ ICE server issue:", event.url || 'unknown');
+    };
+
+    return pc;
+  };
+
   useEffect(() => {
     socketRef.current = getSocket();
     console.log("🔌 WebRTC Hook initialized:", {
@@ -30,9 +88,6 @@ export default function useWebRTC(user) {
       socketRef.current.emit("register", user._id);
       console.log("📝 Registered user with socket:", user._id);
     }
-
-    // Helper function to create peer connection with enhanced configuration
-    const createPeerConnection = () => {
       const pc = new RTCPeerConnection({
         iceServers: [
           // Use only the most reliable servers
@@ -85,9 +140,6 @@ export default function useWebRTC(user) {
         // Simplified error handling - only log critical errors
         console.log("ℹ️ ICE server issue:", event.url || 'unknown');
       };
-
-      return pc;
-    };
 
     // Create RTCPeerConnection
     pcRef.current = createPeerConnection();
