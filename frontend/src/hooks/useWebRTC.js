@@ -18,6 +18,38 @@ export default function useWebRTC(user) {
   const callSessionRef = useRef(null); // Track active call sessions
   const retryCountRef = useRef(0); // Track connection retry attempts
   const isRetryingRef = useRef(false); // Prevent multiple simultaneous retries
+  const iceStageRef = useRef(0); // ICE staging: 0=minimal,1=expanded,2=full,3=turn-only
+  const statsIntervalRef = useRef(null);
+  const iceEscalationTimeoutRef = useRef(null);
+
+  const ICE_STAGES = [
+    [ // Stage 0 minimal
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" },
+      { urls: ["turn:relay1.expressturn.com:3478?transport=udp","turn:relay1.expressturn.com:3478?transport=tcp"], username: "efCZWX3MTI071W2V6N", credential: "mGWa8dVKpR4FgpE" }
+    ],
+    [ // Stage 1 add metered
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" },
+      { urls: ["turn:relay1.expressturn.com:3478?transport=udp","turn:relay1.expressturn.com:3478?transport=tcp"], username: "efCZWX3MTI071W2V6N", credential: "mGWa8dVKpR4FgpE" },
+      { urls: ["turn:a.relay.metered.ca:80","turn:a.relay.metered.ca:443"], username: "a71c31d416502d8c9b8dec95", credential: "2lrtyK5RqnEIg5hx" }
+    ],
+    [ // Stage 2 full
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" },
+      { urls: "stun:stun2.l.google.com:19302" },
+      { urls: "stun:stun3.l.google.com:19302" },
+      { urls: "stun:stun4.l.google.com:19302" },
+      { urls: ["turn:relay1.expressturn.com:3478?transport=udp","turn:relay1.expressturn.com:3478?transport=tcp"], username: "efCZWX3MTI071W2V6N", credential: "mGWa8dVKpR4FgpE" },
+      { urls: ["turn:a.relay.metered.ca:80","turn:a.relay.metered.ca:443"], username: "a71c31d416502d8c9b8dec95", credential: "2lrtyK5RqnEIg5hx" },
+      { urls: ["turn:openrelay.metered.ca:80","turn:openrelay.metered.ca:443"], username: "openrelayproject", credential: "openrelayproject" }
+    ],
+    [ // Stage 3 TURN-only forced relay
+      { urls: ["turn:relay1.expressturn.com:3478?transport=udp","turn:relay1.expressturn.com:3478?transport=tcp"], username: "efCZWX3MTI071W2V6N", credential: "mGWa8dVKpR4FgpE" },
+      { urls: ["turn:a.relay.metered.ca:80","turn:a.relay.metered.ca:443"], username: "a71c31d416502d8c9b8dec95", credential: "2lrtyK5RqnEIg5hx" },
+      { urls: ["turn:openrelay.metered.ca:80","turn:openrelay.metered.ca:443"], username: "openrelayproject", credential: "openrelayproject" }
+    ]
+  ];
 
   // Helper function to reset peer connection completely
   const resetPeerConnection = () => {
@@ -250,6 +282,85 @@ export default function useWebRTC(user) {
     return pc;
   };
 
+  const clearDiagnostics = () => {
+    if (statsIntervalRef.current) { clearInterval(statsIntervalRef.current); statsIntervalRef.current = null; }
+    if (iceEscalationTimeoutRef.current) { clearTimeout(iceEscalationTimeoutRef.current); iceEscalationTimeoutRef.current = null; }
+  };
+
+  const startIceDiagnostics = (pc) => {
+    if (statsIntervalRef.current) clearInterval(statsIntervalRef.current);
+    statsIntervalRef.current = setInterval(async () => {
+      if (!pc) return;
+      try {
+        const stats = await pc.getStats();
+        let selected = null; let pairs = 0;
+        stats.forEach(r => { if (r.type === 'candidate-pair') { pairs++; if (r.state === 'succeeded' && r.nominated) selected = r; } });
+        if (selected) {
+          console.log(`✅ Selected pair stage ${iceStageRef.current} RTT:${(selected.currentRoundTripTime||0).toFixed(3)} local:${selected.localCandidateId} remote:${selected.remoteCandidateId}`);
+        } else {
+          console.log(`⏳ ICE checking stage ${iceStageRef.current} pairs:${pairs}`);
+        }
+      } catch {}
+    }, 3000);
+  };
+
+  const scheduleIceEscalation = (pc, stage) => {
+    if (iceEscalationTimeoutRef.current) clearTimeout(iceEscalationTimeoutRef.current);
+    iceEscalationTimeoutRef.current = setTimeout(() => {
+      if (!pc) return;
+      if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') return;
+      if (stage < ICE_STAGES.length - 1) {
+        iceStageRef.current = stage + 1;
+        console.log(`⚠️ Escalating ICE to stage ${iceStageRef.current}`);
+        rebuildPeerConnectionPreserveTracks();
+      } else {
+        console.log('❌ All ICE stages exhausted without connection.');
+        clearDiagnostics();
+      }
+    }, stage === 0 ? 12000 : stage === 1 ? 12000 : 15000);
+  };
+
+  const attachCoreHandlers = (pc) => {
+    pc.ontrack = (e) => { if (remoteVideoRef.current) remoteVideoRef.current.srcObject = e.streams[0]; };
+    pc.onicecandidate = (ev) => { if (ev.candidate && remoteUserIdRef.current) socketRef.current.emit('webrtc:ice-candidate', { candidate: ev.candidate, to: remoteUserIdRef.current }); };
+    pc.oniceconnectionstatechange = () => {
+      const s = pc.iceConnectionState;
+      console.log('🧊 ICE state (stage', iceStageRef.current, '):', s);
+      if (s === 'connected' || s === 'completed') { clearDiagnostics(); setConnectionQuality(s==='completed'?'excellent':'good'); setCallState('active'); }
+    };
+  };
+
+  const buildPeerConnectionForStage = (stage) => {
+    const servers = ICE_STAGES[stage] || ICE_STAGES[ICE_STAGES.length-1];
+    console.log('🧊 Building PC for stage', stage, servers.map(s=>s.urls));
+    const pc = new RTCPeerConnection({
+      iceServers: servers,
+      iceCandidatePoolSize: stage === 0 ? 0 : 5,
+      bundlePolicy: 'balanced',
+      iceTransportPolicy: 'all',
+      rtcpMuxPolicy: 'require'
+    });
+    attachCoreHandlers(pc);
+    startIceDiagnostics(pc);
+    scheduleIceEscalation(pc, stage);
+    return pc;
+  };
+
+  const rebuildPeerConnectionPreserveTracks = () => {
+    const old = pcRef.current;
+    const localTracks = localStreamRef.current ? [...localStreamRef.current.getTracks()] : [];
+    if (old) { try { old.close(); } catch {} }
+    pcRef.current = buildPeerConnectionForStage(iceStageRef.current);
+    localTracks.forEach(t => pcRef.current.addTrack(t, localStreamRef.current));
+    // If we are the caller and already attempted, re-create and send a new offer
+    if (callState === 'answering' || callState === 'idle') {
+      if (user?.role === 'doctor' && remoteUserIdRef.current) {
+        console.log('🔁 Re-sending offer after escalation stage', iceStageRef.current);
+        startCall(remoteUserIdRef.current);
+      }
+    }
+  };
+
   useEffect(() => {
     socketRef.current = getSocket();
     console.log("🔌 WebRTC Hook initialized:", {
@@ -284,7 +395,9 @@ export default function useWebRTC(user) {
     }
 
     // Create RTCPeerConnection
-    pcRef.current = createPeerConnection();
+    /* Replaced original createPeerConnection with staged builder */
+    iceStageRef.current = 0;
+    pcRef.current = buildPeerConnectionForStage(iceStageRef.current);
 
     // When remote track arrives, attach it to remote video
     pcRef.current.ontrack = (event) => {
