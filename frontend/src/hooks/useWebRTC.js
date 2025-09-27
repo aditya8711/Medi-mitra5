@@ -35,42 +35,20 @@ export default function useWebRTC(user) {
     const createPeerConnection = () => {
       const pc = new RTCPeerConnection({
         iceServers: [
-          // Primary Google STUN servers
+          // Use only the most reliable servers
           { urls: "stun:stun.l.google.com:19302" },
-          { urls: "stun:stun1.l.google.com:19302" },
-          { urls: "stun:stun2.l.google.com:19302" },
-          { urls: "stun:stun3.l.google.com:19302" },
-          { urls: "stun:stun4.l.google.com:19302" },
-          // Alternative STUN servers for better reliability
-          { urls: "stun:relay.webwormhole.io:3478" },
-          { urls: "stun:stun.nextcloud.com:443" },
-          { urls: "stun:stun.sipnet.net:3478" },
-          { urls: "stun:stun.antisip.com:3478" },
-          // TURN server as backup
-          {
-            urls: "turn:openrelay.metered.ca:80",
-            username: "openrelayproject",
-            credential: "openrelayproject"
-          }
+          { urls: "stun:stun1.l.google.com:19302" }
         ],
-        iceCandidatePoolSize: 10, // Pre-gather candidates for faster connection
-        iceTransportPolicy: 'all', // Use both STUN and TURN
-        bundlePolicy: 'max-bundle', // Bundle all media streams
-        rtcpMuxPolicy: 'require' // Require RTCP multiplexing
+        iceCandidatePoolSize: 0 // Disable pre-gathering to reduce candidate flood
       });
 
-      // Enhanced connection monitoring
+      // Simple connection monitoring
       pc.onconnectionstatechange = () => {
         const state = pc.connectionState;
-        console.log("🔗 Connection state changed:", state);
-        
         if (state === 'connected') {
-          console.log("✅ WebRTC connection established successfully");
+          console.log("✅ Call connected successfully");
         } else if (state === 'failed') {
-          console.log("❌ Connection failed - connection lost");
-          // Could implement reconnection logic here
-        } else if (state === 'disconnected') {
-          console.log("⚠️ Connection disconnected - attempting to reconnect");
+          console.log("❌ Connection failed");
         }
       };
 
@@ -79,62 +57,20 @@ export default function useWebRTC(user) {
         console.log("🧊 ICE Connection state:", iceState);
         
         if (iceState === 'connected' || iceState === 'completed') {
-          console.log("🎉 WebRTC call connected successfully! Audio/video should be flowing.");
-        } else if (iceState === 'failed') {
-          console.log("❌ ICE connection failed - attempting ICE restart");
-          // Attempt ICE restart
-          if (pc.restartIce && typeof pc.restartIce === 'function') {
-            try {
-              pc.restartIce();
-              console.log("🔄 ICE restart initiated");
-            } catch (err) {
-              console.error("❌ ICE restart failed:", err);
-            }
-          }
-        } else if (iceState === 'checking') {
-          console.log("🔍 ICE checking connectivity...");
-        } else if (iceState === 'disconnected') {
-          console.log("⚠️ ICE disconnected - monitoring for recovery...");
-          // Set a timeout to attempt restart if it doesn't recover
-          setTimeout(() => {
-            if (pc.iceConnectionState === 'disconnected') {
-              console.log("🔄 ICE still disconnected after 5s - attempting restart");
-              if (pc.restartIce && typeof pc.restartIce === 'function') {
-                try {
-                  pc.restartIce();
-                } catch (err) {
-                  console.error("❌ ICE restart failed:", err);
-                }
-              }
-            }
-          }, 5000);
-        } else if (iceState === 'new') {
-          console.log("🆕 ICE connection initialized");
+          console.log("✅ WebRTC connected successfully!");
         }
       };
 
-      // Add ICE gathering state monitoring
+      // Simple ICE gathering monitoring
       pc.onicegatheringstatechange = () => {
-        console.log("🧊 ICE Gathering state:", pc.iceGatheringState);
+        if (pc.iceGatheringState === 'complete') {
+          console.log("✅ ICE gathering complete");
+        }
       };
 
-      let stunErrorCount = 0;
       pc.onicecandidateerror = (event) => {
-        // Categorize and handle different types of ICE errors
-        if (event.url && event.url.includes('turn')) {
-          console.warn("⚠️ TURN server unavailable (using STUN fallback):", event.url);
-        } else if (event.url && event.url.includes('stun')) {
-          stunErrorCount++;
-          console.log("ℹ️ STUN server issue (backup servers available):", event.url, event.errorText);
-          
-          // If too many STUN failures, suggest direct connection
-          if (stunErrorCount >= 3) {
-            console.warn("⚠️ Multiple STUN failures detected - network may have NAT/firewall restrictions");
-            console.log("💡 Attempting direct peer connection...");
-          }
-        } else {
-          console.error("❌ ICE candidate error:", event);
-        }
+        // Simplified error handling - only log critical errors
+        console.log("ℹ️ ICE server issue:", event.url || 'unknown');
       };
 
       return pc;
