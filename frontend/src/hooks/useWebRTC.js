@@ -39,7 +39,8 @@ export default function useWebRTC(user) {
           { urls: "stun:stun.l.google.com:19302" },
           { urls: "stun:stun1.l.google.com:19302" }
         ],
-        iceCandidatePoolSize: 0 // Disable pre-gathering to reduce candidate flood
+        iceCandidatePoolSize: 0, // Disable pre-gathering to reduce candidate flood
+        iceTransportPolicy: 'all' // Allow both relay and direct connections
       });
 
       // Simple connection monitoring
@@ -52,12 +53,24 @@ export default function useWebRTC(user) {
         }
       };
 
+      let connectionTimeout;
       pc.oniceconnectionstatechange = () => {
         const iceState = pc.iceConnectionState;
         console.log("🧊 ICE Connection state:", iceState);
         
         if (iceState === 'connected' || iceState === 'completed') {
           console.log("✅ WebRTC connected successfully!");
+          if (connectionTimeout) clearTimeout(connectionTimeout);
+        } else if (iceState === 'checking') {
+          // Set a timeout for connection attempts
+          connectionTimeout = setTimeout(() => {
+            if (pc.iceConnectionState === 'checking') {
+              console.log("⏱️ Connection timeout - both peers may be behind NAT");
+            }
+          }, 10000);
+        } else if (iceState === 'failed') {
+          console.log("❌ Connection failed - both peers likely behind NAT/firewall");
+          if (connectionTimeout) clearTimeout(connectionTimeout);
         }
       };
 
@@ -243,6 +256,10 @@ export default function useWebRTC(user) {
   // Helper: request media with fallbacks
   const getLocalMedia = async () => {
     const constraintsList = [
+      { 
+        video: { width: { ideal: 640 }, height: { ideal: 480 } }, 
+        audio: { echoCancellation: true, noiseSuppression: true } 
+      },
       { video: true, audio: true },
       { video: false, audio: true },
     ];
