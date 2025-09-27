@@ -13,20 +13,30 @@ import http from "http";
 import { Server as SocketIOServer } from "socket.io";
 import initSocket from "./services/socket.js";
 import Ragroutes from "./routes/ragRoutes.js";
-import os from "os";   // ✅ Added to detect IPv4
+import os from "os";   // ✅ Detect IPv4
 
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// ✅ Support multiple comma-separated frontend origins (e.g. local + production)
+const rawOrigins = process.env.FRONTEND_URL || "http://localhost:5173,http://localhost:3000";
+const ALLOWED_ORIGINS = rawOrigins.split(",").map(o => o.trim()).filter(Boolean);
+console.log("🌐 Allowed CORS origins:", ALLOWED_ORIGINS);
 
 // ✅ MongoDB connection
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("✅ Connected to MongoDB", mongoose.connection.name))
   .catch((err) => console.error("MongoDB connection error:", err));
 
-// ✅ CORS config
+// ✅ CORS config (dynamic, supports multiple origins & non-browser clients)
 app.use(cors({
-  origin: process.env.FRONTEND_URL,
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // Allow mobile apps / curl
+    if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    console.warn("🚫 CORS blocked origin:", origin);
+    return callback(new Error("Not allowed by CORS"));
+  },
   credentials: true,
 }));
 
@@ -75,22 +85,24 @@ Patient says: "${query}"
   }
 });
 
-// ✅ Socket.io setup
+// ✅ Socket.io setup (must use SAME server instance that we listen on)
 const server = http.createServer(app);
-
 const io = new SocketIOServer(server, {
   cors: {
-    origin: process.env.FRONTEND_URL,
-    methods: ["GET", "POST"],
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+      console.warn("🚫 Socket CORS blocked origin:", origin);
+      return callback(new Error("Not allowed by Socket.io CORS"));
+    },
     credentials: true,
   },
   transports: ["websocket", "polling"],
   pingTimeout: 60000,
+  path: "/socket.io", // explicit for clarity
 });
 app.set("io", io);
-
-// Init sockets
-initSocket(io);
+initSocket(io); // initialize events & middleware
 
 // Appointment completion
 app.post("/api/appointments/complete", async (req, res) => {
@@ -118,8 +130,17 @@ function getLocalIPv4() {
   return "localhost";
 }
 
-// Start server
-app.listen(PORT, () => {
- 
-  console.log(`🚀 Server running on http:/localhost:${PORT}`);
-})
+// 🔍 Health & diagnostics
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", uptime: process.uptime(), timestamp: Date.now() });
+});
+
+// Start server (IMPORTANT: use server.listen for Socket.io to work)
+server.listen(PORT, () => {
+  const ipv4 = getLocalIPv4();
+  console.log("🚀 Server listening:");
+  console.log(`   Local:   http://localhost:${PORT}`);
+  console.log(`   LAN:     http://${ipv4}:${PORT}`);
+  console.log(`   Origins: ${ALLOWED_ORIGINS.join(", ")}`);
+  console.log("📡 Socket.io namespace path: /socket.io");
+});
