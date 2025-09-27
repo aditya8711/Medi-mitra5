@@ -2,8 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getSocket } from "../utils/socket";
 
-// Restore to working configuration from earlier conversation
-const USE_SIMPLE_CONFIG = true;
+// Clean WebRTC implementation
 
 export default function useWebRTC(user) {
   const [incomingOffer, setIncomingOffer] = useState(null);
@@ -120,84 +119,30 @@ export default function useWebRTC(user) {
 
   // Helper function to create peer connection with enhanced configuration
   const createPeerConnection = () => {
-    // Restore working configuration from earlier successful connections
+    // Simple, working ICE configuration
     const iceServers = [
-      // Primary STUN servers (most reliable, unlimited free)
       { urls: "stun:stun.l.google.com:19302" },
       { urls: "stun:stun1.l.google.com:19302" },
-      { urls: "stun:stun2.l.google.com:19302" },
-      { urls: "stun:stun3.l.google.com:19302" },
-      { urls: "stun:stun4.l.google.com:19302" },
-      
-      // High-quality TURN servers (more reliable free options)
       {
-        urls: ["turn:relay1.expressturn.com:3478"],
+        urls: "turn:relay1.expressturn.com:3478",
         username: "efCZWX3MTI071W2V6N",
         credential: "mGWa8dVKpR4FgpE"
-      },
-      {
-        urls: ["turn:a.relay.metered.ca:80", "turn:a.relay.metered.ca:80?transport=tcp"],
-        username: "a71c31d416502d8c9b8dec95",
-        credential: "2lrtyK5RqnEIg5hx"
-      },
-      {
-        urls: ["turn:a.relay.metered.ca:443", "turn:a.relay.metered.ca:443?transport=tcp"],
-        username: "a71c31d416502d8c9b8dec95",
-        credential: "2lrtyK5RqnEIg5hx"
-      },
-      
-      // Fallback TURN servers (original working ones as backup)
-      {
-        urls: ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:80?transport=tcp"],
-        username: "openrelayproject",
-        credential: "openrelayproject"
-      },
-      {
-        urls: ["turn:openrelay.metered.ca:443", "turn:openrelay.metered.ca:443?transport=tcp"],
-        username: "openrelayproject", 
-        credential: "openrelayproject"
-      },
-      
-      // Additional free TURN servers for redundancy
-      {
-        urls: ["turn:turn.bistri.com:80"],
-        username: "homeo",
-        credential: "homeo"
-      },
-      {
-        urls: ["turn:turn.anyfirewall.com:443?transport=tcp"],
-        username: "webrtc",
-        credential: "webrtc"
       }
     ];
-
-    console.log('🧊 Restored working ICE servers:', iceServers.length, 'servers');
     
     const pc = new RTCPeerConnection({
       iceServers,
-      iceCandidatePoolSize: 10, // Pre-gather more candidates for better connectivity
-      iceTransportPolicy: 'all', // Allow both relay and direct connections
-      bundlePolicy: 'balanced', // More compatible than max-bundle
+      bundlePolicy: 'max-bundle',
       rtcpMuxPolicy: 'require'
     });
 
-    // Enhanced connection monitoring with quality tracking
+    // Simple connection state tracking
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
-      console.log('🔗 Connection state changed to:', state);
-      
+      console.log('🔗 Connection state:', state);
       if (state === 'connected') {
         console.log("✅ Call connected successfully");
         setConnectionQuality('excellent');
-      } else if (state === 'connecting') {
-        console.log("🔗 Connection state: connecting - peer connection establishing...");
-        setConnectionQuality('fair');
-      } else if (state === 'disconnected') {
-        setConnectionQuality('poor');
-        console.log("🔄 Connection disconnected, attempting recovery...");
-      } else if (state === 'failed') {
-        console.log("❌ Connection failed");
-        setConnectionQuality('poor');
       }
     };
 
@@ -519,18 +464,8 @@ export default function useWebRTC(user) {
             new RTCSessionDescription(payload.answer)
           );
           console.log("✅ Remote answer applied successfully");
-          hasRemoteAnswerRef.current = true; // Mark that we have the remote answer
-          
-          // In classical mode, give a moment for ICE to establish, then check status
-          if (CLASSIC_P2P_MODE) {
-            setTimeout(() => {
-              if (pcRef.current) {
-                console.log(`🔍 Classical P2P status check - ICE: ${pcRef.current.iceConnectionState}, Signaling: ${pcRef.current.signalingState}`);
-              }
-            }, 3000);
-          }
-          
-          setCallState('active'); // Call is now active
+          hasRemoteAnswerRef.current = true;
+          setCallState('active');
         }
       } catch (err) {
         console.error("❌ Error applying remote answer:", err);
