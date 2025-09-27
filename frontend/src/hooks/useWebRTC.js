@@ -18,6 +18,34 @@ export default function useWebRTC(user) {
   const callSessionRef = useRef(null); // Track active call sessions
   const retryCountRef = useRef(0); // Track connection retry attempts
 
+  // Helper function to reset peer connection completely
+  const resetPeerConnection = () => {
+    if (pcRef.current) {
+      pcRef.current.close();
+    }
+    
+    // Create a fresh peer connection
+    pcRef.current = retryCountRef.current >= 2 ? createSimplePeerConnection() : createPeerConnection();
+    
+    // Setup handlers
+    pcRef.current.ontrack = (event) => {
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = event.streams[0];
+      }
+    };
+    
+    pcRef.current.onicecandidate = (event) => {
+      if (event.candidate && remoteUserIdRef.current) {
+        socketRef.current.emit("webrtc:ice-candidate", {
+          candidate: event.candidate,
+          to: remoteUserIdRef.current,
+        });
+      }
+    };
+    
+    console.log("🔄 Peer connection reset for retry", retryCountRef.current >= 2 ? "(simplified)" : "(enhanced)");
+  };
+
   // Helper function to create peer connection with enhanced configuration
   const createSimplePeerConnection = () => {
     console.log("🔄 Creating simplified peer connection (STUN only)");
@@ -71,7 +99,7 @@ export default function useWebRTC(user) {
           credential: "muazkh"
         }
       ],
-      iceCandidatePoolSize: 0, // Disable pre-gathering to reduce candidate flood
+      iceCandidatePoolSize: 10, // Pre-gather more candidates for better connectivity
       iceTransportPolicy: 'all', // Allow both relay and direct connections
       bundlePolicy: 'max-bundle',
       rtcpMuxPolicy: 'require'
@@ -114,8 +142,10 @@ export default function useWebRTC(user) {
         connectionTimeout = setTimeout(() => {
           if (pc.iceConnectionState === 'checking') {
             console.log("⏱️ Connection timeout - forcing retry...");
-            // Force a retry by triggering failed state
+            // Reset state and create fresh connection for retry
             if (user?.role === 'doctor') {
+              setCallState('idle');
+              resetPeerConnection();
               setTimeout(() => startCall(remoteUserIdRef.current), 1000);
             }
           }
@@ -130,6 +160,8 @@ export default function useWebRTC(user) {
         if (retryCountRef.current <= 3) {
           setTimeout(() => {
             if (user?.role === 'doctor' && callState !== 'active') {
+              setCallState('idle');
+              resetPeerConnection();
               startCall(remoteUserIdRef.current);
             }
           }, 1000 * retryCountRef.current); // Progressive delay
@@ -404,27 +436,7 @@ export default function useWebRTC(user) {
       return;
     }
     
-    // Use simplified connection after multiple failures
-    if (retryCountRef.current >= 2) {
-      console.log("🔄 Using simplified connection (STUN only) after failures");
-      pcRef.current = createSimplePeerConnection();
-      
-      // Setup handlers for simplified connection
-      pcRef.current.ontrack = (event) => {
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = event.streams[0];
-        }
-      };
-      
-      pcRef.current.onicecandidate = (event) => {
-        if (event.candidate && remoteUserIdRef.current) {
-          socketRef.current.emit("webrtc:ice-candidate", {
-            candidate: event.candidate,
-            to: remoteUserIdRef.current,
-          });
-        }
-      };
-    }
+
     
     remoteUserIdRef.current = targetUserId;
     try {
