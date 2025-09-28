@@ -36,55 +36,6 @@ export default function useWebRTC(user) {
   // Initialize
   useEffect(() => {
     socketRef.current = getSocket();
-    
-    // Create peer connection
-    pcRef.current = new RTCPeerConnection({ iceServers });
-    
-    // Handle remote stream
-    pcRef.current.ontrack = (event) => {
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = event.streams[0];
-      }
-    };
-    
-    // Handle ICE candidates
-    pcRef.current.onicecandidate = (event) => {
-      if (event.candidate && remoteUserIdRef.current) {
-        socketRef.current.emit("webrtc:ice-candidate", {
-          candidate: event.candidate,
-          to: remoteUserIdRef.current,
-        });
-      }
-    };
-    
-    // Connection state with detailed logging
-    pcRef.current.oniceconnectionstatechange = () => {
-      const state = pcRef.current.iceConnectionState;
-      console.log('🔗 ICE Connection state:', state);
-      
-      if (state === 'connected' || state === 'completed') {
-        console.log('✅ Call connected successfully!');
-        setCallState('active');
-      } else if (state === 'failed') {
-        console.error('❌ ICE connection failed - checking firewall/network');
-      } else if (state === 'disconnected') {
-        console.warn('⚠️ ICE connection disconnected - may reconnect');
-      } else if (state === 'checking') {
-        console.log('🔍 ICE checking - establishing connection...');
-      }
-    };
-
-    // Add connection state change handler
-    pcRef.current.onconnectionstatechange = () => {
-      const state = pcRef.current.connectionState;
-      console.log('🌐 Peer connection state:', state);
-      
-      if (state === 'failed') {
-        console.error('❌ Peer connection failed completely');
-      } else if (state === 'disconnected') {
-        console.warn('⚠️ Peer connection disconnected');
-      }
-    };
 
     // Register user - join room with their ID so they can receive WebRTC signals
     if (user?._id || user?.id) {
@@ -160,11 +111,69 @@ export default function useWebRTC(user) {
     }
   };
 
+  // Recreate peer connection if closed or invalid
+  const createPeerConnection = () => {
+    if (pcRef.current) {
+      pcRef.current.close();
+    }
+    
+    pcRef.current = new RTCPeerConnection({ iceServers });
+    
+    // Set up event handlers
+    pcRef.current.onicecandidate = (event) => {
+      if (event.candidate && socketRef.current && remoteUserIdRef.current) {
+        console.log('📤 Sending ICE candidate');
+        socketRef.current.emit("webrtc:ice-candidate", {
+          candidate: event.candidate,
+          to: remoteUserIdRef.current,
+        });
+      }
+    };
+
+    pcRef.current.ontrack = (event) => {
+      console.log('📺 Received remote track:', event.track.kind);
+      if (remoteVideoRef.current && event.streams[0]) {
+        remoteVideoRef.current.srcObject = event.streams[0];
+        console.log('✅ Remote video stream attached');
+      }
+    };
+
+    pcRef.current.oniceconnectionstatechange = () => {
+      const state = pcRef.current.iceConnectionState;
+      console.log('🔗 ICE Connection state:', state);
+      
+      if (state === 'connected' || state === 'completed') {
+        console.log('✅ Call connected successfully!');
+        setCallState('active');
+      } else if (state === 'failed') {
+        console.error('❌ ICE connection failed - checking firewall/network');
+      } else if (state === 'disconnected') {
+        console.warn('⚠️ ICE connection disconnected - may reconnect');
+      } else if (state === 'checking') {
+        console.log('🔍 ICE checking - establishing connection...');
+      }
+    };
+
+    pcRef.current.onconnectionstatechange = () => {
+      const state = pcRef.current.connectionState;
+      console.log('🌐 Peer connection state:', state);
+      
+      if (state === 'failed') {
+        console.error('❌ Peer connection failed completely');
+      } else if (state === 'disconnected') {
+        console.warn('⚠️ Peer connection disconnected');
+      }
+    };
+  };
+
   // Start call (for doctor)
   const startCall = async (targetUserId) => {
     try {
       console.log('📞 Starting call to:', targetUserId);
       remoteUserIdRef.current = targetUserId;
+      
+      // Create fresh peer connection
+      createPeerConnection();
       
       // Get local media with error handling
       console.log('🎥 Requesting camera and microphone access...');
@@ -212,6 +221,9 @@ export default function useWebRTC(user) {
         console.error('❌ No incoming offer to answer');
         return;
       }
+      
+      // Create fresh peer connection for answering
+      createPeerConnection();
       
       // Get local media
       console.log('🎥 Patient requesting camera and microphone access...');
@@ -277,29 +289,14 @@ export default function useWebRTC(user) {
     // Close peer connection
     if (pcRef.current) {
       pcRef.current.close();
-      pcRef.current = new RTCPeerConnection({ iceServers });
-      
-      // Re-setup handlers
-      pcRef.current.ontrack = (event) => {
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = event.streams[0];
-        }
-      };
-      
-      pcRef.current.onicecandidate = (event) => {
-        if (event.candidate && remoteUserIdRef.current) {
-          socketRef.current.emit("webrtc:ice-candidate", {
-            candidate: event.candidate,
-            to: remoteUserIdRef.current,
-          });
-        }
-      };
+      pcRef.current = null;
     }
     
     // Reset state
     setCallState('idle');
     setIncomingOffer(null);
     remoteUserIdRef.current = null;
+    queuedCandidatesRef.current = []; // Clear queued candidates
     
     // Clear video elements
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
