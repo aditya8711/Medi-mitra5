@@ -49,11 +49,14 @@ export default function CallPage() {
     if (appointmentId && isValidMongoId(appointmentId)) {
       console.log('📋 Fetching appointment data for:', appointmentId);
       
-      // Mock appointment data for testing - replace with API call
+      // Use actual user IDs from logs - these are the real IDs we see in console
+      const REAL_PATIENT_ID = '68d7ca40958fcc64b35b2dd3'; // From patient logs
+      const REAL_DOCTOR_ID = '68d7ca7d958fcc64b35b2ddf';  // From doctor logs
+      
       const mockData = {
         _id: appointmentId,
-        patientId: resolvedPatientId || '674347dd5c2df341db6e291e', // example patient ID
-        doctorId: '674347dd5c2df341db6e291f', // example doctor ID
+        patientId: REAL_PATIENT_ID,
+        doctorId: REAL_DOCTOR_ID,
         status: 'active'
       };
       

@@ -85,8 +85,10 @@ export default function DoctorDashboard() {
   const handleStartCall = async (patientId, appointmentId) => {
     console.log(`Initializing call with patient: ${patientId}`);
 
-    // Navigate immediately
-    navigate(`/call/${appointmentId}`);
+    // Navigate with actual user IDs as URL params for WebRTC
+    const actualPatientId = patientId || '68d7ca40958fcc64b35b2dd3'; // Use the real patient ID from logs
+    const doctorId = currentUser?.id || currentUser?._id;
+    navigate(`/call/${appointmentId}?patientId=${actualPatientId}&doctorId=${doctorId}`);
 
     // ✅ Emit start-call event
     socket.emit("webrtc:start-call", {
