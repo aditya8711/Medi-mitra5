@@ -42,14 +42,42 @@ export default function useWebRTC(user) {
       const userId = user._id || user.id;
       console.log('🏠 Joining room for user:', userId);
       socketRef.current.emit("join", userId);
+      
+      // Also emit register for backup room joining
+      socketRef.current.emit("register", userId);
+      console.log('📝 Backup registration sent for user:', userId);
     }
 
     // Socket listeners
     socketRef.current.on("webrtc:offer", handleOffer);
     socketRef.current.on("webrtc:answer", handleAnswer);
     socketRef.current.on("webrtc:ice-candidate", handleIceCandidate);
+    
+    // Re-join room on socket reconnection
+    socketRef.current.on("connect", () => {
+      if (user?._id || user?.id) {
+        const userId = user._id || user.id;
+        console.log('🔄 Socket reconnected, re-joining room:', userId);
+        socketRef.current.emit("join", userId);
+        socketRef.current.emit("register", userId);
+      }
+    });
+    
+    // Debug: Log WebRTC listener status periodically
+    const debugInterval = setInterval(() => {
+      if (socketRef.current) {
+        console.log('🔍 WebRTC Debug Check:', {
+          socketConnected: socketRef.current.connected,
+          hasOfferListener: socketRef.current.listeners('webrtc:offer').length > 0,
+          callState: callState,
+          userRole: userRole,
+          userId: user?._id || user?.id
+        });
+      }
+    }, 10000); // Every 10 seconds
 
     return () => {
+      clearInterval(debugInterval);
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(track => track.stop());
       }
@@ -61,12 +89,18 @@ export default function useWebRTC(user) {
 
   // Handle incoming offer
   const handleOffer = async (payload) => {
-    console.log('📥 Incoming WebRTC offer from:', payload.from, payload);
+    console.log('� WEBRTC OFFER RECEIVED! 🚨');
+    console.log('�📥 Incoming WebRTC offer from:', payload.from);
+    console.log('📋 Offer payload:', payload);
     console.log('📋 Current call state:', callState);
     console.log('📋 Current user ID:', user?._id || user?.id);
+    console.log('📋 Socket connected:', socketRef.current?.connected);
+    
     setIncomingOffer(payload);
     setCallState('incoming');
     remoteUserIdRef.current = payload.from;
+    
+    console.log('✅ Offer processed, state set to incoming');
   };
 
   // Handle answer
