@@ -71,22 +71,34 @@ export default function useWebRTC(user) {
 
   // Handle answer
   const handleAnswer = async (payload) => {
-    console.log('📥 Received answer');
-    if (pcRef.current && payload?.answer) {
-      await pcRef.current.setRemoteDescription(new RTCSessionDescription(payload.answer));
-      setCallState('active');
-      
-      // Process any queued ICE candidates
-      console.log(`📥 Processing ${queuedCandidatesRef.current.length} queued ICE candidates`);
-      for (const candidate of queuedCandidatesRef.current) {
-        try {
-          await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
-          console.log('✅ Queued ICE candidate processed');
-        } catch (error) {
-          console.warn('⚠️ Failed to process queued candidate:', error);
+    try {
+      console.log('📥 Received answer');
+      if (pcRef.current && payload?.answer) {
+        // Check signaling state before setting remote description
+        const currentState = pcRef.current.signalingState;
+        console.log('📋 Current signaling state:', currentState);
+        
+        if (currentState === 'have-local-offer') {
+          await pcRef.current.setRemoteDescription(new RTCSessionDescription(payload.answer));
+          setCallState('active');
+          
+          // Process any queued ICE candidates
+          console.log(`📥 Processing ${queuedCandidatesRef.current.length} queued ICE candidates`);
+          for (const candidate of queuedCandidatesRef.current) {
+            try {
+              await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+              console.log('✅ Queued ICE candidate processed');
+            } catch (error) {
+              console.warn('⚠️ Failed to process queued candidate:', error);
+            }
+          }
+          queuedCandidatesRef.current = []; // Clear queue
+        } else {
+          console.warn('⚠️ Ignoring answer - not in correct signaling state:', currentState);
         }
       }
-      queuedCandidatesRef.current = []; // Clear queue
+    } catch (error) {
+      console.error('❌ Error processing answer:', error);
     }
   };
 

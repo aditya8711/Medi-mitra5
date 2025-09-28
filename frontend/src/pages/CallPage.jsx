@@ -76,25 +76,19 @@ export default function CallPage() {
     }
   }, [appointmentId, resolvedPatientId, user]);
 
-  // Auto-start call for doctor, auto-answer for both with incoming offers
+  // Auto-start call for doctor only, patient waits for incoming offer
   useEffect(() => {
     if (!appointmentData) return;
 
     if (user?.role === 'doctor' && callState === 'idle') {
-      // Doctor initiates the call
+      // Only doctor initiates the call
       const targetUserId = appointmentData.patientId;
       if (targetUserId && isValidMongoId(targetUserId)) {
         console.log(`🔄 Doctor starting call to patient:`, targetUserId);
         startCall(targetUserId);
       }
-    } else if (user?.role === 'patient' && callState === 'idle') {
-      // Patient also needs to initialize WebRTC to be ready to receive offers
-      const targetUserId = appointmentData.doctorId;
-      if (targetUserId && isValidMongoId(targetUserId)) {
-        console.log(`🔄 Patient initializing WebRTC for doctor:`, targetUserId);
-        startCall(targetUserId);
-      }
     }
+    // Patient does NOT start a call - waits for incoming offer from doctor
   }, [appointmentData, callState, user, startCall]);
 
   // Handle incoming offers (both doctor and patient auto-answer)
