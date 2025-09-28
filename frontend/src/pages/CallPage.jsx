@@ -35,6 +35,7 @@ export default function CallPage() {
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [reason, setReason] = useState('');
   const [appointmentData, setAppointmentData] = useState(null);
+  const [hasRemoteStream, setHasRemoteStream] = useState(false);
 
   // Manual refs for draggable local preview wrapper
   const remoteWrapperRef = useRef(null);
@@ -75,7 +76,7 @@ export default function CallPage() {
     }
   }, [appointmentId, resolvedPatientId, user]);
 
-  // Auto-start call for doctor, auto-answer for patient with incoming offer
+  // Auto-start call for doctor, auto-answer for both with incoming offers
   useEffect(() => {
     if (!appointmentData) return;
 
@@ -96,10 +97,10 @@ export default function CallPage() {
     }
   }, [appointmentData, callState, user, startCall]);
 
-  // Handle incoming offers (patient auto-answers)
+  // Handle incoming offers (both doctor and patient auto-answer)
   useEffect(() => {
-    if (user?.role === 'patient' && incomingOffer && callState === 'incoming') {
-      console.log(`🔄 Patient answering incoming call`);
+    if (incomingOffer && callState === 'incoming') {
+      console.log(`🔄 ${user?.role} auto-answering incoming call`);
       answerCall();
     }
   }, [incomingOffer, callState, user, answerCall]);
@@ -211,6 +212,21 @@ export default function CallPage() {
     }
   };
 
+  // Monitor remote video stream
+  useEffect(() => {
+    const checkRemoteStream = () => {
+      if (remoteVideoRef.current && remoteVideoRef.current.srcObject) {
+        setHasRemoteStream(true);
+        console.log('📺 Remote stream detected, showing video');
+      } else {
+        setHasRemoteStream(false);
+      }
+    };
+
+    const interval = setInterval(checkRemoteStream, 500);
+    return () => clearInterval(interval);
+  }, []);
+
   // Navigate back to dashboard after call ends
   useEffect(() => {
     if (callState === 'idle' && elapsed > 0) {
@@ -231,7 +247,7 @@ export default function CallPage() {
     <div className="call-container">
       <div className="call-stage">
         <div className="remote-wrapper" ref={remoteWrapperRef} style={{position:'absolute', inset:0}}>
-          {callState === 'active' ? (
+          {(callState === 'active' || callState === 'connecting' || hasRemoteStream) ? (
             <video ref={remoteVideoRef} className="remote-video" autoPlay playsInline />
           ) : (
             <div className="remote-placeholder" style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',color:'#bbb',fontSize:'1.2rem'}}>
@@ -247,6 +263,7 @@ export default function CallPage() {
                 <div><strong>Debug Info:</strong></div>
                 <div>Role: {user?.role}</div>
                 <div>Call State: {callState}</div>
+                <div>Has Remote Stream: {hasRemoteStream ? 'Yes' : 'No'}</div>
                 <div>Appointment: {appointmentId}</div>
                 {appointmentData && (
                   <>
@@ -256,6 +273,8 @@ export default function CallPage() {
                   </>
                 )}
                 {incomingOffer && <div style={{color:'#4ade80'}}>📞 Incoming Offer Available</div>}
+                <div>Local Video: {localVideoRef.current?.srcObject ? 'Connected' : 'None'}</div>
+                <div>Remote Video: {remoteVideoRef.current?.srcObject ? 'Connected' : 'None'}</div>
               </div>
             </div>
           )}
