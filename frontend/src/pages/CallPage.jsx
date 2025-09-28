@@ -76,28 +76,39 @@ export default function CallPage() {
     }
   }, [appointmentId, resolvedPatientId, user]);
 
-  // Auto-start call for doctor only, patient waits for incoming offer
+  // Auto-start call for doctor, patient initializes to be ready
   useEffect(() => {
     if (!appointmentData) return;
 
     if (user?.role === 'doctor' && callState === 'idle') {
-      // Only doctor initiates the call
+      // Doctor initiates the call
       const targetUserId = appointmentData.patientId;
       if (targetUserId && isValidMongoId(targetUserId)) {
         console.log(`🔄 Doctor starting call to patient:`, targetUserId);
         startCall(targetUserId);
       }
+    } else if (user?.role === 'patient' && callState === 'idle') {
+      // Patient waits for offers - no action needed here
+      // The useWebRTC hook should handle incoming offers
+      console.log(`🔄 Patient ready to receive calls`);
     }
-    // Patient does NOT start a call - waits for incoming offer from doctor
   }, [appointmentData, callState, user, startCall]);
 
   // Handle incoming offers (both doctor and patient auto-answer)
   useEffect(() => {
+    console.log(`📋 Offer check - incomingOffer: ${!!incomingOffer}, callState: ${callState}, role: ${user?.role}`);
     if (incomingOffer && callState === 'incoming') {
       console.log(`🔄 ${user?.role} auto-answering incoming call`);
       answerCall();
     }
   }, [incomingOffer, callState, user, answerCall]);
+
+  // Additional debugging for patient call state
+  useEffect(() => {
+    if (user?.role === 'patient') {
+      console.log(`📋 Patient debug - callState: ${callState}, hasOffer: ${!!incomingOffer}, appointmentData: ${!!appointmentData}`);
+    }
+  }, [callState, incomingOffer, appointmentData, user]);
 
   const handleDoctorStart = () => {
     const targetId = appointmentData?.patientId || resolvedPatientId;
