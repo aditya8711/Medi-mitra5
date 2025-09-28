@@ -70,7 +70,7 @@ export default function useWebRTC(user) {
           socketConnected: socketRef.current.connected,
           hasOfferListener: socketRef.current.listeners('webrtc:offer').length > 0,
           callState: callState,
-          userRole: userRole,
+          userRole: user?.role,
           userId: user?._id || user?.id
         });
       }
