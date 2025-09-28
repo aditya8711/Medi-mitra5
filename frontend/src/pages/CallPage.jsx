@@ -78,28 +78,48 @@ export default function CallPage() {
     }
   }, [appointmentId, resolvedPatientId, user]);
 
-  // Initialize camera immediately when CallPage loads
+  // Force camera initialization using doctor's exact pattern
   useEffect(() => {
-    const initializeCamera = async () => {
+    const forceInitializeCamera = async () => {
       try {
-        console.log('📹 CallPage: Requesting immediate camera/microphone access...');
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { width: { ideal: 1280 }, height: { ideal: 720 } }, 
-          audio: { echoCancellation: true, noiseSuppression: true } 
-        });
+        console.log('📹 CallPage: FORCE requesting camera (doctor pattern)...');
         
+        // Use exact same getUserMedia call as doctor's startCall
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        
+        console.log('✅ CallPage: Got media stream successfully');
+        
+        // Force attachment to video element
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
-          console.log('✅ CallPage: Local video stream attached to element');
+          console.log('✅ CallPage: Stream attached to local video element');
+          
+          // Force play like in WebRTC hook
+          localVideoRef.current.play().catch(e => {
+            console.warn('⚠️ Local video autoplay issue:', e);
+          });
         } else {
-          console.log('⚠️ CallPage: Local video element not ready yet');
+          console.log('⚠️ CallPage: Local video element not available');
         }
+        
+        // Log tracks exactly like doctor
+        stream.getTracks().forEach(track => {
+          console.log('➕ CallPage track:', track.kind, track.label, 'enabled:', track.enabled);
+        });
+        
       } catch (error) {
-        console.error('❌ CallPage: Failed to get camera/microphone:', error);
+        console.error('❌ CallPage: FORCE camera failed:', error);
+        console.error('Error details:', {
+          name: error.name,
+          message: error.message,
+          constraint: error.constraint
+        });
       }
     };
 
-    initializeCamera();
+    // Run immediately and also after a short delay
+    forceInitializeCamera();
+    setTimeout(forceInitializeCamera, 1000);
   }, []);
 
   // Auto-start call for doctor, patient initializes to be ready
@@ -264,6 +284,32 @@ export default function CallPage() {
       }
     }
   }, [localVideoRef.current, retryLocalStreamAttachment]);
+
+  // Aggressive camera retry for patients on laptop
+  useEffect(() => {
+    if (user?.role === 'patient') {
+      const retryCamera = async () => {
+        if (!localVideoRef.current?.srcObject) {
+          console.log('🔄 Patient camera retry attempt...');
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            if (localVideoRef.current) {
+              localVideoRef.current.srcObject = stream;
+              console.log('✅ Patient camera retry SUCCESS!');
+            }
+          } catch (error) {
+            console.warn('⚠️ Patient camera retry failed:', error.message);
+          }
+        }
+      };
+
+      // Retry every 2 seconds for first 10 seconds
+      const retryInterval = setInterval(retryCamera, 2000);
+      setTimeout(() => clearInterval(retryInterval), 10000);
+
+      return () => clearInterval(retryInterval);
+    }
+  }, [user]);
 
   // Debug: Log when video elements are mounted
   useEffect(() => {

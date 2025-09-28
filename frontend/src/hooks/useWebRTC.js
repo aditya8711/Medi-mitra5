@@ -249,30 +249,35 @@ export default function useWebRTC(user) {
     };
   };
 
-  // Initialize local media stream (for patients to be ready)
+  // Initialize local media stream (using doctor's reliable pattern)
   const initializeLocalMedia = async () => {
     try {
-      console.log('🚀 initializeLocalMedia called for patient');
+      console.log('🚀 initializeLocalMedia called for patient - using doctor pattern');
       
       if (localStreamRef.current) {
         console.log('📱 Local media already initialized');
-        return;
+        return localStreamRef.current;
       }
 
-      console.log('🎥 Initializing patient camera and microphone...');
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { width: { ideal: 1280 }, height: { ideal: 720 } }, 
-        audio: { echoCancellation: true, noiseSuppression: true } 
-      });
+      console.log('🎥 Patient requesting camera/microphone (doctor pattern)...');
       
+      // Use exact same constraints as doctor's startCall
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       localStreamRef.current = stream;
       
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
-        console.log('✅ Patient local video stream ready');
+        console.log('✅ Patient local video stream attached (doctor pattern)');
       } else {
-        console.log('📦 Local video element not ready, stream stored');
+        console.log('📦 Local video element not ready, stream stored for later');
       }
+      
+      // Log tracks like doctor does
+      stream.getTracks().forEach(track => {
+        console.log('➕ Patient has track:', track.kind, track.label);
+      });
+      
+      return stream;
     } catch (error) {
       console.error('❌ Failed to initialize patient media:', error);
       if (error.name === 'NotAllowedError') {
