@@ -196,37 +196,57 @@ export default function initSocket(io) {
 
     // ✅ WebRTC signaling events (for useWebRTC.js compatibility)
     socket.on("webrtc:offer", ({ to, offer, from }) => {
-      console.log(`📞 WebRTC offer from ${from || socket.data.user?.id} to ${to}`);
+      const fromId = from || socket.data.user?.id;
+      console.log(`📞 WebRTC offer from ${fromId} to ${to}`);
+      console.log(`📋 Room info - socket rooms:`, [...socket.rooms]);
+      console.log(`📋 Target room exists:`, io.sockets.adapter.rooms.has(to));
+      console.log(`📋 Target room size:`, io.sockets.adapter.rooms.get(to)?.size || 0);
+      
       io.to(to).emit("webrtc:offer", {
-        from: from || socket.data.user?.id,
+        from: fromId,
         offer,
       });
+      console.log(`📤 WebRTC offer sent to room ${to}`);
     });
 
     socket.on("webrtc:answer", ({ to, answer, from }) => {
-      console.log(`📞 WebRTC answer from ${from || socket.data.user?.id} to ${to}`);
+      const fromId = from || socket.data.user?.id;
+      console.log(`📞 WebRTC answer from ${fromId} to ${to}`);
+      console.log(`📋 Target room exists:`, io.sockets.adapter.rooms.has(to));
+      
       io.to(to).emit("webrtc:answer", {
-        from: from || socket.data.user?.id,
+        from: fromId,
         answer,
       });
+      console.log(`📤 WebRTC answer sent to room ${to}`);
     });
 
     socket.on("webrtc:ice-candidate", ({ to, candidate, from }) => {
-      console.log(`📞 ICE candidate from ${from || socket.data.user?.id} to ${to}`);
+      const fromId = from || socket.data.user?.id;
+      console.log(`📞 ICE candidate from ${fromId} to ${to}`);
+      
       io.to(to).emit("webrtc:ice-candidate", {
-        from: from || socket.data.user?.id,
+        from: fromId,
         candidate,
       });
+      console.log(`📤 ICE candidate sent to room ${to}`);
     });
 
     // ✅ User registration / join rooms
     socket.on("join", (userId) => {
-      if (userId) socket.join(userId);
+      if (userId) {
+        socket.join(userId);
+        console.log(`🏠 User ${userId} joined room (socket: ${socket.id})`);
+        console.log(`📋 Room ${userId} now has ${io.sockets.adapter.rooms.get(userId)?.size || 0} members`);
+      }
     });
 
     socket.on("register", (data) => {
       const userId = data?.userId || data;
-      if (userId) socket.join(userId);
+      if (userId) {
+        socket.join(userId);
+        console.log(`📝 User ${userId} registered to room (socket: ${socket.id})`);
+      }
     });
 
     // ✅ Consultation & queue logic (untouched)
