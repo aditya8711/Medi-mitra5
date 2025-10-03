@@ -87,7 +87,7 @@ function Login() {
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
         </svg>
-        Back to Home
+        Back
       </Link>
 
       <div

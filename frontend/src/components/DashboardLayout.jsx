@@ -45,8 +45,8 @@ export default function DashboardLayout({
         style={{
           flex: 1,
           display: 'flex',
-          padding: '1rem',
-          gap: '1rem',
+          padding: '0.5rem',
+          gap: '0.5rem',
           overflow: 'hidden'
         }}
       >
@@ -87,10 +87,10 @@ export default function DashboardLayout({
           className="simple-main" // This class is for the mobile layout in CSS
           style={{
             flex: 1,
-            overflowY: 'auto',
-            padding: '1rem',
+            padding: '0.5rem',
             background: '#1a1a1a',
-            borderRadius: '12px'
+            borderRadius: '8px',
+            height: '100%'
           }}
         >
           {children}

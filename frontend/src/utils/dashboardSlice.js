@@ -6,6 +6,15 @@ export const fetchAttendedPatients = createAsyncThunk(
     return response.data?.data || [];
   }
 );
+
+// Thunk for digital records with prescriptions
+export const fetchDigitalRecords = createAsyncThunk(
+  'dashboard/fetchDigitalRecords',
+  async () => {
+    const response = await api.apiFetch('/api/prescriptions/records');
+    return response.data?.records || [];
+  }
+);
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import api from './api';
 
@@ -42,6 +51,7 @@ const initialState = {
   prescriptions: [],
   doctors: [],
   attendedPatients: [],
+  digitalRecords: [],
   loading: false,
   error: null,
 };
@@ -74,7 +84,14 @@ const dashboardSlice = createSlice({
         state.attendedPatients = action.payload;
         state.loading = false;
       })
-      .addCase(fetchAttendedPatients.rejected, (state) => { state.loading = false; });
+      .addCase(fetchAttendedPatients.rejected, (state) => { state.loading = false; })
+      // Digital Records Logic
+      .addCase(fetchDigitalRecords.pending, (state) => { state.loading = true; })
+      .addCase(fetchDigitalRecords.fulfilled, (state, action) => {
+        state.digitalRecords = action.payload;
+        state.loading = false;
+      })
+      .addCase(fetchDigitalRecords.rejected, (state) => { state.loading = false; });
   },
 });
 

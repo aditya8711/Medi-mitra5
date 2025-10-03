@@ -6,7 +6,7 @@ import { loginSuccess } from '../utils/authSlice';
 import AnimatedButton from "../components/AnimatedButton";
 import logo from "../logo.png";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000"; 
 
 const Signup = () => {
   // Spotlight effect
@@ -125,7 +125,7 @@ const Signup = () => {
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
         </svg>
-        Back to Home
+        Back
       </Link>
 
       {/* Signup Card */}

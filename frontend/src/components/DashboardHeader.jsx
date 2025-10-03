@@ -38,7 +38,7 @@ export default function DashboardHeader({ title, onMenuClick, onRefresh, quickAc
 
       {/* Center Section - Simplified to only show the title */}
       <div className="header-center">
-        <div className="header-title">{title || 'Dashboard'}</div>
+        <div className="header-title">{'Doctor Dashboard'}</div>
       </div>
 
       {/* Right Section - quick actions + refresh + language toggles */}

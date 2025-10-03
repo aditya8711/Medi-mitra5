@@ -14,7 +14,9 @@ import {
   getDoctorQueue,
   getAppointmentById,
   completeAppointment,
-  getAttendedPatients
+  getAttendedPatients,
+  getPatientCompleteHistory,
+  debugPatientData
 } from '../controllers/mainController.js';
 import { listSockets, listUsers } from '../controllers/debugController.js';
 
@@ -38,6 +40,12 @@ router.get('/queue/doctor', authenticateJWT, authorizeRoles('doctor'), getDoctor
 
 // --- Doctor attended patients ---
 router.get('/doctor/attended-patients', authenticateJWT, authorizeRoles('doctor'), getAttendedPatients);
+
+// --- Patient complete history (accepts uniqueId or MongoDB ObjectID for backward compatibility) ---
+router.get('/patient/:patientId/complete-history', authenticateJWT, authorizeRoles('doctor'), getPatientCompleteHistory);
+
+// --- Debug route ---
+router.get('/debug/patient/:patientId', debugPatientData);
 
 router.get('/appointments/:id', authenticateJWT, getAppointmentById);
 

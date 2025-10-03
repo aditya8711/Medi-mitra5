@@ -9,6 +9,7 @@ import mainRoutes from "./routes/main.js";
 import protectedRoutes from "./routes/protected.js";
 import Appointment from "./models/Appointment.js";
 import authRoutes from "./routes/auth.js";
+import prescriptionRoutes from "./routes/prescriptionRoutes.js";
 import http from "http";
 import { Server as SocketIOServer } from "socket.io";
 import initSocket from "./services/socket.js";
@@ -43,6 +44,7 @@ app.use(cookieParser());
 app.use("/api/auth", authRoutes);
 app.use("/api", mainRoutes);
 app.use("/api", protectedRoutes);
+app.use("/api", prescriptionRoutes);
 app.use("/api", Ragroutes);
 
 // Gemini agent

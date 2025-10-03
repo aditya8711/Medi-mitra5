@@ -8,13 +8,54 @@ export const getAttendedPatients = async (req, res) => {
     if (req.user.role !== 'doctor') {
       return res.status(403).json({ success: false, message: 'Access denied. Only doctors can view attended patients.' });
     }
+    
     const attendedAppointments = await Appointment.find({
       doctor: req.user.id,
       status: 'completed'
     })
-    .populate('patient', 'name email uniqueId')
-    .sort({ date: -1 });
-    return res.json({ success: true, data: attendedAppointments });
+    .populate('patient', 'name email uniqueId phone')
+    .populate('prescription')
+    .sort({ attendedAt: -1, date: -1 });
+
+    // Transform the data to use secure unique IDs instead of MongoDB ObjectIDs
+    const attendedPatientsWithPrescriptions = attendedAppointments.map(appointment => ({
+      appointmentRef: appointment.uniqueId || `APT-${appointment._id.toString().slice(-8)}`, // Secure reference
+      patient: {
+        uniqueId: appointment.patient?.uniqueId,
+        name: appointment.patient?.name,
+        email: appointment.patient?.email,
+        phone: appointment.patient?.phone
+      },
+      date: appointment.date,
+      attendedAt: appointment.attendedAt || appointment.date,
+      symptoms: appointment.symptoms,
+      complaints: appointment.complaints,
+      reason: appointment.reason,
+      status: appointment.status,
+      prescriptions: appointment.prescription ? [{
+        prescriptionRef: `PRESC-${appointment.prescription._id.toString().slice(-8)}`, // Secure reference
+        medicines: appointment.prescription.medicines,
+        notes: appointment.prescription.notes,
+        nextVisit: appointment.prescription.nextVisit,
+        createdAt: appointment.prescription.createdAt
+      }] : [],
+      // Add visit-like structure for digital records compatibility
+      visits: [{
+        date: appointment.attendedAt || appointment.date,
+        complaints: appointment.complaints || appointment.symptoms?.join(', ') || '',
+        symptoms: appointment.symptoms || [],
+        reason: appointment.reason || '',
+        prescriptions: appointment.prescription?.medicines || [],
+        doctors: req.user.name,
+        doctor: { 
+          name: req.user.name,
+          uniqueId: req.user.uniqueId 
+        },
+        status: 'completed'
+      }]
+    }));
+    
+    return res.json({ success: true, data: attendedPatientsWithPrescriptions });
   } catch (err) {
     console.error('getAttendedPatients:error', err);
     return res.status(500).json({ success: false, message: 'Failed to fetch attended patients.', error: err.message });
@@ -32,7 +73,23 @@ export const getDoctorQueue = async (req, res) => {
     .populate('patient', 'name email uniqueId')
     .sort({ date: 1 });
 
-    res.json(queue);
+    // Sanitize response - remove MongoDB ObjectIDs and use secure references
+    const sanitizedQueue = queue.map(appointment => ({
+      appointmentRef: `APT-${appointment._id.toString().slice(-8)}`, // Secure reference
+      patient: {
+        uniqueId: appointment.patient?.uniqueId,
+        name: appointment.patient?.name,
+        email: appointment.patient?.email
+      },
+      date: appointment.date,
+      symptoms: appointment.symptoms,
+      complaints: appointment.complaints,
+      reason: appointment.reason,
+      status: appointment.status,
+      slot: appointment.slot
+    }));
+
+    res.json(sanitizedQueue);
   } catch (err) {
     console.error('Error fetching doctor queue:', err);
     res.status(500).json({ message: 'Failed to fetch queue.' });
@@ -211,5 +268,194 @@ export const startCall = async (req, res) => {
   } catch (err) {
     console.error('Error starting call:', err);
     res.status(500).json({ message: 'Failed to start call.' });
+  }
+};
+
+// Debug endpoint to check patient data
+export const debugPatientData = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    
+    console.log('=== DEBUGGING PATIENT DATA ===');
+    console.log('Patient ID:', patientId);
+    
+    // Check if patient exists
+    const patient = await User.findById(patientId);
+    console.log('Patient found:', patient ? patient.name : 'NOT FOUND');
+    
+    // Get ALL appointments (regardless of status)
+    const allAppointments = await Appointment.find({ patient: patientId });
+    console.log('Total appointments found:', allAppointments.length);
+    allAppointments.forEach(apt => {
+      console.log(`  Appointment: ${apt._id}, Status: ${apt.status}, Date: ${apt.date}`);
+    });
+    
+    // Get ALL prescriptions
+    const allPrescriptions = await Prescription.find({ patient: patientId });
+    console.log('Total prescriptions found:', allPrescriptions.length);
+    allPrescriptions.forEach(presc => {
+      console.log(`  Prescription: ${presc._id}, Medicines: ${presc.medicines?.length || 0}`);
+    });
+    
+    return res.json({
+      patient: patient ? { name: patient.name, email: patient.email } : null,
+      appointments: allAppointments.length,
+      prescriptions: allPrescriptions.length,
+      appointmentDetails: allAppointments,
+      prescriptionDetails: allPrescriptions
+    });
+  } catch (err) {
+    console.error('Debug error:', err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+// Get complete history of a patient including all prescriptions and visits
+export const getPatientCompleteHistory = async (req, res) => {
+  try {
+    if (req.user.role !== 'doctor') {
+      return res.status(403).json({ success: false, message: 'Access denied. Only doctors can view patient history.' });
+    }
+
+    const { patientId } = req.params;
+
+    console.log('Fetching complete history for patient ID:', patientId);
+
+    // Determine if patientId is a MongoDB ObjectID or uniqueId
+    let patientQuery;
+    if (mongoose.Types.ObjectId.isValid(patientId)) {
+      // For backward compatibility, still support MongoDB ObjectID
+      patientQuery = { _id: patientId };
+    } else {
+      // Use uniqueId for secure queries
+      patientQuery = { uniqueId: patientId };
+    }
+
+    // Get the actual patient first to get the MongoDB _id for queries
+    const patient = await User.findOne(patientQuery);
+    if (!patient) {
+      return res.status(404).json({ success: false, message: 'Patient not found.' });
+    }
+
+    const actualPatientId = patient._id;
+
+    // Get all appointments for this patient with all statuses to capture more data
+    const allAppointments = await Appointment.find({
+      patient: actualPatientId
+    })
+    .populate('patient', 'name email uniqueId phone age gender bloodGroup')
+    .populate('prescription')
+    .populate('doctor', 'name')
+    .sort({ attendedAt: -1, date: -1 });
+
+    console.log('Found appointments:', allAppointments.length);
+
+    // Get all prescriptions for this patient
+    const allPrescriptions = await Prescription.find({
+      patient: actualPatientId
+    })
+    .populate('patient', 'name email uniqueId phone age gender bloodGroup')
+    .populate('doctor', 'name')
+    .populate('appointment')
+    .sort({ createdAt: -1 });
+
+    console.log('Found prescriptions:', allPrescriptions.length);
+
+    // Use the patient info we already retrieved
+    const patientInfo = patient;
+
+    console.log('Patient info found:', patientInfo ? patientInfo.name : 'No patient found');
+
+    // Log appointment statuses for debugging
+    console.log('Appointment statuses found:');
+    allAppointments.forEach(apt => {
+      console.log(`  Appointment ${apt._id}: status="${apt.status}", date=${apt.date}`);
+    });
+
+    // Filter appointments - be more inclusive to capture more data
+    const completedAppointments = allAppointments.filter(apt => 
+      apt.status === 'completed' || apt.status === 'attended' || apt.status === 'scheduled'
+    );
+    
+    console.log(`Filtered appointments: ${completedAppointments.length} out of ${allAppointments.length}`);
+
+    // Calculate proper statistics - include all appointments for now to show data
+    const totalVisits = allAppointments.length; // Show all appointments for debugging
+    const totalPrescriptions = allPrescriptions.length;
+    
+    // Find first and last visit dates from all appointments
+    let firstVisitDate = null;
+    let latestVisitDate = null;
+    
+    if (allAppointments.length > 0) {
+      const sortedByDate = [...allAppointments].sort((a, b) => {
+        const aDate = new Date(a.attendedAt || a.date);
+        const bDate = new Date(b.attendedAt || b.date);
+        return aDate - bDate; // Ascending order for first visit
+      });
+      
+      firstVisitDate = sortedByDate[0].attendedAt || sortedByDate[0].date;
+      latestVisitDate = sortedByDate[sortedByDate.length - 1].attendedAt || sortedByDate[sortedByDate.length - 1].date;
+    }
+
+    // Structure the complete history with secure IDs (no MongoDB ObjectIDs exposed)
+    const completeHistory = {
+      patient: patientInfo ? {
+        uniqueId: patientInfo.uniqueId,
+        name: patientInfo.name,
+        email: patientInfo.email,
+        phone: patientInfo.phone,
+        age: patientInfo.age,
+        gender: patientInfo.gender,
+        bloodGroup: patientInfo.bloodGroup
+      } : null,
+      totalVisits,
+      totalPrescriptions,
+      firstVisit: firstVisitDate,
+      latestVisit: latestVisitDate,
+      visits: allAppointments.map(appointment => ({
+        visitRef: `VISIT-${appointment._id.toString().slice(-8)}`, // Secure reference
+        visitDate: appointment.attendedAt || appointment.date,
+        doctor: appointment.doctor ? {
+          name: appointment.doctor.name,
+          uniqueId: appointment.doctor.uniqueId
+        } : null,
+        symptoms: appointment.symptoms || [],
+        complaints: appointment.complaints || '',
+        reason: appointment.reason || '',
+        status: appointment.status,
+        prescription: appointment.prescription ? {
+          prescriptionRef: `PRESC-${appointment.prescription._id.toString().slice(-8)}`, // Secure reference
+          medicines: appointment.prescription.medicines || [],
+          notes: appointment.prescription.notes || '',
+          nextVisit: appointment.prescription.nextVisit || '',
+          createdAt: appointment.prescription.createdAt
+        } : null
+      })),
+      allPrescriptions: allPrescriptions.map(prescription => ({
+        prescriptionRef: `PRESC-${prescription._id.toString().slice(-8)}`, // Secure reference
+        medicines: prescription.medicines || [],
+        notes: prescription.notes || '',
+        nextVisit: prescription.nextVisit || '',
+        createdAt: prescription.createdAt,
+        doctor: prescription.doctor ? {
+          name: prescription.doctor.name,
+          uniqueId: prescription.doctor.uniqueId
+        } : null,
+        appointmentRef: prescription.appointment ? `VISIT-${prescription.appointment._id.toString().slice(-8)}` : null
+      }))
+    };
+
+    console.log('Complete history response:', {
+      patientName: patientInfo?.name,
+      totalVisits,
+      totalPrescriptions,
+      visitsCount: completeHistory.visits.length
+    });
+
+    return res.json({ success: true, data: completeHistory });
+  } catch (err) {
+    console.error('getPatientCompleteHistory:error', err);
+    return res.status(500).json({ success: false, message: 'Failed to fetch patient complete history.', error: err.message });
   }
 };
