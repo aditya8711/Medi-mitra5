@@ -16,6 +16,45 @@ export default function useWebRTC(user) {
   const remoteUserIdRef = useRef(null);
   const queuedCandidatesRef = useRef([]); // Queue ICE candidates until remote description is set
   const pendingRemoteStreamRef = useRef(null); // Store remote stream when video element isn't ready
+  const lastRemoteStreamIdRef = useRef(null); // Track the stream already attached to avoid duplicate loads
+
+  const ensureRemotePlayback = (videoEl) => {
+    if (!videoEl) {
+      return;
+    }
+
+    const attemptPlay = () => {
+      if (!videoEl.isConnected) {
+        console.warn('⏭️ Skipping remote autoplay - element not in DOM');
+        return;
+      }
+      videoEl.play().catch(err => {
+        console.warn('⚠️ Remote video autoplay failed (attempt):', err);
+        setTimeout(() => {
+          if (!videoEl.isConnected) {
+            console.warn('⏭️ Skipping remote autoplay retry - element not in DOM');
+            return;
+          }
+          videoEl.play().catch(e => console.warn('⚠️ Retry remote play failed:', e));
+        }, 250);
+      });
+    };
+
+    if (videoEl.readyState >= 1) {
+      attemptPlay();
+    } else {
+      videoEl.addEventListener('loadedmetadata', attemptPlay, { once: true });
+      setTimeout(() => {
+        if (!videoEl.isConnected) {
+          console.warn('⏭️ Skipping remote autoplay fallback - element not in DOM');
+          return;
+        }
+        if (videoEl.readyState < 1) {
+          attemptPlay();
+        }
+      }, 500);
+    }
+  };
 
   // Enhanced ICE servers for better connectivity
   const iceServers = [
@@ -210,15 +249,29 @@ export default function useWebRTC(user) {
         
         // Store the stream for later attachment if video element isn't ready
         pendingRemoteStreamRef.current = stream;
-        
+
+        const attachStream = (videoEl, s) => {
+          try {
+            if (videoEl.srcObject === s || lastRemoteStreamIdRef.current === s.id) {
+              console.log('🔁 Remote stream already attached, ensuring playback');
+              ensureRemotePlayback(videoEl);
+              return;
+            }
+
+            videoEl.srcObject = s;
+            videoEl.muted = true; // keep muted for autoplay compliance
+            lastRemoteStreamIdRef.current = s.id;
+
+            ensureRemotePlayback(videoEl);
+          } catch (err) {
+            console.warn('⚠️ Error attaching remote stream:', err);
+          }
+        };
+
         if (remoteVideoRef.current) {
           console.log('✅ Video element ready, attaching stream immediately');
-          remoteVideoRef.current.srcObject = stream;
-          
-          // Force video element to play
-          remoteVideoRef.current.play().catch(e => {
-            console.warn('⚠️ Remote video autoplay failed:', e);
-          });
+          // schedule attachment on next tick to avoid DOM removal race
+          setTimeout(() => attachStream(remoteVideoRef.current, stream), 0);
         } else {
           console.log('📦 Video element not ready, stream stored for later attachment');
         }
@@ -405,21 +458,34 @@ export default function useWebRTC(user) {
   const retryRemoteStreamAttachment = () => {
     if (pendingRemoteStreamRef.current && remoteVideoRef.current && !remoteVideoRef.current.srcObject) {
       console.log('🔄 Retrying remote stream attachment');
+      const stream = pendingRemoteStreamRef.current;
       console.log('🎥 Attaching pending remote stream:', {
-        streamId: pendingRemoteStreamRef.current.id,
-        videoTracks: pendingRemoteStreamRef.current.getVideoTracks().length,
-        audioTracks: pendingRemoteStreamRef.current.getAudioTracks().length,
-        active: pendingRemoteStreamRef.current.active
+        streamId: stream.id,
+        videoTracks: stream.getVideoTracks().length,
+        audioTracks: stream.getAudioTracks().length,
+        active: stream.active
       });
-      
-      remoteVideoRef.current.srcObject = pendingRemoteStreamRef.current;
-      
-      // Force video element to play
-      remoteVideoRef.current.play().catch(e => {
-        console.warn('⚠️ Remote video autoplay failed:', e);
-      });
-      
-      console.log('✅ Pending remote stream attached successfully');
+
+      // reuse same attachment strategy as ontrack
+      setTimeout(() => {
+        try {
+          if (remoteVideoRef.current.srcObject === stream || lastRemoteStreamIdRef.current === stream.id) {
+            console.log('🔁 Remote stream already attached during retry, ensuring playback');
+            remoteVideoRef.current.muted = true;
+            ensureRemotePlayback(remoteVideoRef.current);
+            return;
+          }
+          remoteVideoRef.current.srcObject = stream;
+          // keep muted for autoplay compliance; UI can unmute later
+          remoteVideoRef.current.muted = true;
+          lastRemoteStreamIdRef.current = stream.id;
+          ensureRemotePlayback(remoteVideoRef.current);
+        } catch (err) {
+          console.warn('⚠️ Error during retry attachment:', err);
+        }
+      }, 0);
+
+      console.log('✅ Pending remote stream attachment scheduled');
       return true;
     }
     return false;
@@ -434,6 +500,13 @@ export default function useWebRTC(user) {
       return true;
     }
     return false;
+  };
+
+  const unmuteRemote = () => {
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.muted = false;
+      ensureRemotePlayback(remoteVideoRef.current);
+    }
   };
 
   // End call
@@ -458,6 +531,7 @@ export default function useWebRTC(user) {
     remoteUserIdRef.current = null;
     queuedCandidatesRef.current = []; // Clear queued candidates
     pendingRemoteStreamRef.current = null; // Clear pending remote stream
+    lastRemoteStreamIdRef.current = null; // Reset attached stream tracker
     
     // Clear video elements
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
@@ -472,6 +546,7 @@ export default function useWebRTC(user) {
     endCall,
     retryRemoteStreamAttachment,
     retryLocalStreamAttachment,
+    unmuteRemote,
     incomingOffer,
     callState
   };
