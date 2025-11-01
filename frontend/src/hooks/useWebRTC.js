@@ -78,17 +78,16 @@ export default function useWebRTC(user) {
   // Enhanced ICE servers for better connectivity
   const iceServers = [
     { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
-    { urls: "stun:stun.cloudflare.com:3478" },
-    { 
-      urls: ["turn:relay1.expressturn.com:3478?transport=udp", "turn:relay1.expressturn.com:3478?transport=tcp"],
-      username: "efCZWX3MTI071W2V6N", 
-      credential: "mGWa8dVKpR4FgpE" 
-    },
+    { urls: "stun:stun.relay.metered.ca:80" },
     {
-      urls: ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443"],
-      username: "openrelayproject",
-      credential: "openrelayproject"
+      urls: [
+        "turn:global.relay.metered.ca:80",
+        "turn:global.relay.metered.ca:80?transport=tcp",
+        "turn:global.relay.metered.ca:443",
+        "turns:global.relay.metered.ca:443?transport=tcp"
+      ],
+      username: "fccf4b3716ec7a673902fe44",
+      credential: "I6Yf9nfUgNtctLfR"
     }
   ];
 

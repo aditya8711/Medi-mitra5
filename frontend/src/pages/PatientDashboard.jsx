@@ -20,7 +20,15 @@ export default function PatientDashboard() {
   const navigate = useNavigate();
 
   const { user } = useSelector((state) => state.auth);
-  const { appointments, prescriptions, doctors, loading, currentMedicines = [], previousMedicines = [] } = useSelector((state) => state.dashboard);
+  const {
+    appointments,
+    prescriptions,
+    doctors,
+    loading,
+    currentMedicines = [],
+    previousMedicines = [],
+    latestPrescriptionAt,
+  } = useSelector((state) => state.dashboard);
 
   useEffect(() => {
     dispatch(fetchPatientData());
@@ -57,7 +65,16 @@ export default function PatientDashboard() {
     
     switch (activePanel) {
       case "overview":
-        return <PatientOverview user={user} setActivePanel={setActivePanel} appointments={appointments} prescriptions={prescriptions} currentMedicines={currentMedicines} />;
+        return (
+          <PatientOverview
+            user={user}
+            setActivePanel={setActivePanel}
+            appointments={appointments}
+            prescriptions={prescriptions}
+            currentMedicines={currentMedicines}
+            latestPrescriptionAt={latestPrescriptionAt}
+          />
+        );
       case "book":
         return <AppointmentBooking 
                   appointments={appointments} 
@@ -65,7 +82,15 @@ export default function PatientDashboard() {
                   onBookingSuccess={() => setActivePanel('overview')} 
                />;
       case "records":
-        return <HealthRecords prescriptions={prescriptions} />;
+        return (
+          <HealthRecords
+            prescriptions={prescriptions}
+            currentMedicines={currentMedicines}
+            previousMedicines={previousMedicines}
+            latestPrescriptionAt={latestPrescriptionAt}
+            patient={user}
+          />
+        );
       case "medicines":
         return <MedicineTracker currentMedicines={currentMedicines} previousMedicines={previousMedicines} />;
       case "symptoms":

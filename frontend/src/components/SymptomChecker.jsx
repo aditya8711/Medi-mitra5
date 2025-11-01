@@ -73,7 +73,7 @@ export default function SymptomChecker() {
 
   return (
     <div className="symptom-checker">
-  <h2>🧠 {t('symptomCheckerTitle')}</h2>
+  <h2>{t('symptomCheckerTitle')}</h2>
   <p>{t('selectSymptoms')}</p>
 
       <div className="symptom-grid">
@@ -90,7 +90,7 @@ export default function SymptomChecker() {
       </div>
 
       <button className="check-button" onClick={checkSymptoms} disabled={loading}>
-        {loading ? `⏳ ${t('checking')}` : `✅ ${t('checkSymptomsButton')}`}
+        {loading ? `${t('checking')}` : `${t('checkSymptomsButton')}`}
       </button>
 
       {hasResult && (
@@ -99,7 +99,7 @@ export default function SymptomChecker() {
           className="symptom-checker__expand"
           onClick={() => setShowOverlay(true)}
         >
-          {t('expandFullView') || '🔍 पूरी रिपोर्ट देखें'}
+          {t('expandFullView') || 'पूरी रिपोर्ट देखें'}
         </button>
       )}
 

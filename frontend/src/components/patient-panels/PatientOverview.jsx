@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import '../../styles/patient-overview.premium.css';
 import { useLanguage } from '../../utils/LanguageProvider';
 import { useDispatch } from 'react-redux';
@@ -13,18 +13,18 @@ const compactDate = (d) => {
   }
 };
 
-const PatientOverview = ({ user, setActivePanel, appointments = [], prescriptions = [], currentMedicines = [] }) => {
+const PatientOverview = ({ user, setActivePanel, appointments = [], prescriptions = [], currentMedicines = [], latestPrescriptionAt = null }) => {
   const upcoming = (appointments || [])
     .filter(a => a && a.date)
     .sort((a, b) => new Date(a.date) - new Date(b.date))
     .slice(0, 3);
-
   const recentPrescriptions = (prescriptions || []).slice(0, 3);
 
   const { t } = useLanguage();
   const dispatch = useDispatch();
 
   const [editing, setEditing] = useState(false);
+  const [hasUnseenPrescription, setHasUnseenPrescription] = useState(false);
   const [form, setForm] = useState({
     name: user?.name || '',
     age: user?.age || '',
@@ -51,6 +51,39 @@ const PatientOverview = ({ user, setActivePanel, appointments = [], prescription
       alert(err.message || 'Failed to update profile');
     }
   };
+
+  useEffect(() => {
+    const evaluate = () => {
+      if (!latestPrescriptionAt) {
+        setHasUnseenPrescription(false);
+        return;
+      }
+      try {
+        const stored = typeof window !== 'undefined'
+          ? window.localStorage.getItem('mm_prescription_last_seen')
+          : null;
+        const latestIso = new Date(latestPrescriptionAt).toISOString();
+        if (!stored || new Date(latestIso) > new Date(stored)) {
+          setHasUnseenPrescription(true);
+        } else {
+          setHasUnseenPrescription(false);
+        }
+      } catch (err) {
+        console.warn('Prescription badge state unavailable', err);
+        setHasUnseenPrescription(true);
+      }
+    };
+
+    evaluate();
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('mm:prescriptions-seen', evaluate);
+      return () => {
+        window.removeEventListener('mm:prescriptions-seen', evaluate);
+      };
+    }
+    return undefined;
+  }, [latestPrescriptionAt]);
 
   return (
     <div>
@@ -98,7 +131,27 @@ const PatientOverview = ({ user, setActivePanel, appointments = [], prescription
             <div style={{ marginTop: 10, display: 'flex', gap: 10 }}>
               <div className="detail-item"><div className="badge">{currentMedicines?.length || 0}</div><div style={{ fontSize: 12 }}>{t('activeMedicines')}</div></div>
               <div className="detail-item"><div className="badge">{appointments?.length || 0}</div><div style={{ fontSize: 12 }}>{t('appointmentsLabel')}</div></div>
-              <div className="detail-item"><div className="badge">{prescriptions?.length || 0}</div><div style={{ fontSize: 12 }}>{t('prescriptionsLabel')}</div></div>
+              <div className="detail-item" style={{ position: 'relative' }}>
+                <div className="badge">{prescriptions?.length || 0}</div>
+                {hasUnseenPrescription && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: -6,
+                      right: -6,
+                      background: '#22c55e',
+                      color: '#0f172a',
+                      borderRadius: '999px',
+                      padding: '1px 6px',
+                      fontSize: 10,
+                      fontWeight: 700,
+                    }}
+                  >
+                    New
+                  </span>
+                )}
+                <div style={{ fontSize: 12 }}>{t('prescriptionsLabel')}</div>
+              </div>
             </div>
 
             <div className="actions-row">
@@ -115,8 +168,8 @@ const PatientOverview = ({ user, setActivePanel, appointments = [], prescription
               {recentPrescriptions.length > 0 ? (
                 recentPrescriptions.map((p, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <div>{p.medicationName || p.name || 'Prescription'}</div>
-                    <div style={{ color: '#6b7280' }}>{compactDate(p.date)}</div>
+                    <div>{p.medicines && p.medicines[0]?.name ? p.medicines[0].name : (p.medicationName || p.name || 'Prescription')}</div>
+                    <div style={{ color: '#6b7280' }}>{compactDate(p.createdAt || p.date)}</div>
                   </div>
                 ))
               ) : (
