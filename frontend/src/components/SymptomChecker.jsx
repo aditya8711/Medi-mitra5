@@ -10,6 +10,10 @@ export default function SymptomChecker() {
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
   const { t } = useLanguage();
+  const resultPanelStyles = {
+    maxHeight: "50vh",
+    overflowY: "auto",
+  };
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -75,7 +79,7 @@ export default function SymptomChecker() {
       </button>
 
       {result && (
-        <div className="result markdown-output">
+        <div className="result markdown-output" style={resultPanelStyles}>
           <ReactMarkdown>{result}</ReactMarkdown>
         </div>
       )}
