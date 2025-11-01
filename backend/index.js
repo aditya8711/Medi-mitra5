@@ -13,7 +13,7 @@ import prescriptionRoutes from "./routes/prescriptionRoutes.js";
 import http from "http";
 import { Server as SocketIOServer } from "socket.io";
 import initSocket from "./services/socket.js";
-import Ragroutes from "./routes/ragRoutes.js";
+// import Ragroutes from "./routes/ragRoutes.js";
 import os from "os";   // ✅ Added to detect IPv4
 
 dotenv.config();
