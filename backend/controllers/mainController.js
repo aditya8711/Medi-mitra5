@@ -75,7 +75,9 @@ export const getDoctorQueue = async (req, res) => {
 
     // Sanitize response - remove MongoDB ObjectIDs and use secure references
     const sanitizedQueue = queue.map(appointment => ({
-      appointmentRef: `APT-${appointment._id.toString().slice(-8)}`, // Secure reference
+      appointmentRef: `APT-${appointment._id.toString().slice(-8)}`, // Secure reference for UI display
+      appointmentId: appointment._id.toString(), // Provide actual ID for internal actions (start call, complete, etc.)
+      patientId: appointment.patient?._id?.toString(),
       patient: {
         uniqueId: appointment.patient?.uniqueId,
         name: appointment.patient?.name,

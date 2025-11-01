@@ -209,45 +209,45 @@ export default function DoctorDashboard() {
   }, [activePanel, dispatch]);
 
   const handleStartCall = async (patientId, appointmentId) => {
-    console.log(`Initializing call with patient: ${patientId}`);
+    console.log('Initializing call with patient:', patientId);
 
-    // Navigate with actual user IDs as URL params for WebRTC
-    const actualPatientId = patientId || '68d7ca40958fcc64b35b2dd3'; // Use the real patient ID from logs
+    if (!patientId || !appointmentId) {
+      console.error('❌ Start call aborted: missing identifiers', { patientId, appointmentId });
+      return;
+    }
+
     const doctorId = currentUser?.id || currentUser?._id;
-    navigate(`/call/${appointmentId}?patientId=${actualPatientId}&doctorId=${doctorId}`);
+    const doctorQuery = doctorId ? `&doctorId=${doctorId}` : '';
+    navigate(`/call/${appointmentId}?patientId=${patientId}${doctorQuery}`);
 
-    // ✅ Emit start-call event
-    // Log the IDs being used
     console.log('📞 Start call - IDs check:', {
       patientId,
       appointmentId,
+      doctorId,
       hasPatientId: !!patientId,
-      hasAppointmentId: !!appointmentId,
-      patientIdType: typeof patientId,
-      appointmentIdType: typeof appointmentId
+      hasAppointmentId: !!appointmentId
     });
 
-    socket.emit("webrtc:start-call", {
+    socket.emit('webrtc:start-call', {
       patientId,
       fromUserName: currentUser?.name || 'Doctor',
       appointmentId,
     });
 
-    // Optional: backend API logging
     try {
       const res = await api.apiFetch('/api/appointments/start-call', {
         method: 'POST',
-        body: JSON.stringify({ patientId, appointmentId }),
+        body: { patientId, appointmentId },
       });
+
       if (!res.ok) {
         console.warn('Start-call API returned non-ok status:', res.status);
-        const errorData = await res.json().catch(() => ({}));
-        console.error('API Error response:', errorData);
+        console.error('API error response:', res.data);
       } else {
         console.log('✅ Start-call API successful');
       }
     } catch (error) {
-      console.error("Failed to signal start of call:", error);
+      console.error('Failed to signal start of call:', error);
     }
   };
 
@@ -894,12 +894,17 @@ export default function DoctorDashboard() {
   const totalAttended = attendedPatients.length;
   const attendedToday = attendedPatients.filter(p => isSameDay(parsePossibleDate(p))).length;
 
-  const upcomingPreview = patientQueue.slice(0, 6).map((a) => ({
-    name: a.patient?.name || a.name || 'Unknown',
-    appointmentId: a._id || a.appointmentId,
-    patientId: a.patient?._id || a.patientId,
-    time: a.slot || a.time || a.date || ''
-  }));
+  const upcomingPreview = patientQueue.slice(0, 6).map((a) => {
+    const appointmentId = a?.appointmentId || a?._id || null;
+    const patientId = a?.patientId || a?.patient?._id || null;
+
+    return {
+      name: a.patient?.name || a.name || 'Unknown',
+      appointmentId,
+      patientId,
+      time: a.slot || a.time || a.date || ''
+    };
+  });
 
   const renderPanel = () => {
     switch (activePanel) {
@@ -1000,8 +1005,8 @@ export default function DoctorDashboard() {
                 <QueueList 
                   items={patientQueue.map(a => ({
                     name: a.patient?.name || 'Unknown',
-                    appointmentId: a._id,
-                    patientId: a.patient?._id,
+                    appointmentId: a.appointmentId || a._id,
+                    patientId: a.patientId || a.patient?._id,
                     symptoms: a.symptoms || a.reason || a.complaints || 'No symptoms specified',
                     appointmentTime: a.slot || a.time || a.appointmentTime,
                     reason: a.reason || a.purpose
@@ -1009,6 +1014,7 @@ export default function DoctorDashboard() {
                   onStartCall={handleStartCall} 
                   onMarkComplete={handleMarkComplete}
                   onGivePrescription={handleGivePrescription}
+                  currentUser={currentUser}
                 />
               </div>
             }

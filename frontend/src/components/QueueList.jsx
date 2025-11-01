@@ -1,6 +1,15 @@
 import React from 'react';
 
-export default function QueueList({ items = [], onStart, onRecords, onDone, currentUser, allowStart = false }) {
+export default function QueueList({
+  items = [],
+  onStart,
+  onStartCall,
+  onRecords,
+  onMarkComplete,
+  onDone,
+  currentUser,
+  allowStart = false
+}) {
   if (!Array.isArray(items) || items.length === 0) {
     return <div className="simple-card muted">No items</div>;
   }
@@ -16,11 +25,36 @@ export default function QueueList({ items = [], onStart, onRecords, onDone, curr
           <div style={{display:'flex',gap:8,alignItems:'center'}}>
             {(() => {
               const isDoctor = !!(currentUser && typeof currentUser.role === 'string' && currentUser.role.toLowerCase() === 'doctor');
-              const showStart = onStart && (allowStart || isDoctor);
-              return showStart ? <button className="btn" onClick={() => onStart(p.patientId || p.appointmentId)}>Start</button> : null;
+              const hasStartCb = Boolean(onStartCall || onStart);
+              const showStart = hasStartCb && (allowStart || isDoctor);
+              const handleStart = () => {
+                if (onStartCall) {
+                  onStartCall(p.patientId, p.appointmentId);
+                } else if (onStart) {
+                  onStart(p.patientId || p.appointmentId, p.appointmentId);
+                }
+              };
+              return showStart ? <button className="btn" onClick={handleStart}>Start</button> : null;
             })()}
-            {onRecords ? <button className="btn" onClick={() => onRecords(p.patientId || p.appointmentId)}>Records</button> : null}
-            {onDone ? <button className="btn" onClick={() => onDone(p.appointmentId)}>Done</button> : null}
+            {(() => {
+              const hasRecords = Boolean(onGivePrescription || onRecords);
+              if (!hasRecords) return null;
+
+              const handleRecords = () => {
+                if (onGivePrescription) {
+                  onGivePrescription(p);
+                } else if (onRecords) {
+                  onRecords(p.patientId, p.appointmentId);
+                }
+              };
+
+              return <button className="btn" onClick={handleRecords}>Records</button>;
+            })()}
+            {onMarkComplete ? (
+              <button className="btn" onClick={() => onMarkComplete(p.appointmentId)}>Done</button>
+            ) : onDone ? (
+              <button className="btn" onClick={() => onDone(p.appointmentId)}>Done</button>
+            ) : null}
           </div>
         </div>
       ))}
