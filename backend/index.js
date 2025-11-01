@@ -78,7 +78,7 @@ Use Markdown with these sections:
 
   try {
     const completion = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL || "gpt-4o",
+      model: process.env.OPENAI_MODEL || "gpt-4o-mini" || "gpt-3.5-turbo",
       messages: [
         { role: "system", content: "You are a concise rural healthcare assistant. Mirror the patient's language (English, Hindi, Punjabi). Use Markdown with the specified sections." },
         { role: "user", content: query }
