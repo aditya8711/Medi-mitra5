@@ -10,6 +10,7 @@ export default function SymptomChecker() {
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
   const [showOverlay, setShowOverlay] = useState(false);
+  const [hasResult, setHasResult] = useState(false);
   const { t, lang } = useLanguage();
   const resultPanelStyles = {
     maxHeight: "50vh",
@@ -38,6 +39,7 @@ export default function SymptomChecker() {
     setLoading(true);
     setResult("");
     setShowOverlay(false);
+  setHasResult(false);
 
     try {
       const res = await fetch(`${API_URL}/api/gemini-agent`, {
@@ -50,12 +52,16 @@ export default function SymptomChecker() {
       });
 
       const data = await res.json();
-      setResult(data.reply || t('aiNoResponse'));
-      setShowOverlay(true);
+  const reply = data.reply || t('aiNoResponse');
+  setResult(reply);
+  setHasResult(!!reply);
+  setShowOverlay(!!reply);
     } catch (err) {
       console.error("Error calling AI:", err);
-      setResult(t('aiError'));
-      setShowOverlay(true);
+  const fallback = t('aiError');
+  setResult(fallback);
+  setHasResult(true);
+  setShowOverlay(true);
     } finally {
       setLoading(false);
     }
@@ -87,17 +93,14 @@ export default function SymptomChecker() {
         {loading ? `⏳ ${t('checking')}` : `✅ ${t('checkSymptomsButton')}`}
       </button>
 
-      {result && (
-        <div className="result markdown-output" style={resultPanelStyles}>
-          <ReactMarkdown>{result}</ReactMarkdown>
-          <button
-            type="button"
-            className="symptom-checker__expand"
-            onClick={() => setShowOverlay(true)}
-          >
-            {t('expandFullView') || '🔍 पूरी रिपोर्ट देखें'}
-          </button>
-        </div>
+      {hasResult && (
+        <button
+          type="button"
+          className="symptom-checker__expand"
+          onClick={() => setShowOverlay(true)}
+        >
+          {t('expandFullView') || '🔍 पूरी रिपोर्ट देखें'}
+        </button>
       )}
 
       {showOverlay && result && (
