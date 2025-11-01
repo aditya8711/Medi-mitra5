@@ -59,26 +59,29 @@ app.get("/", (req, res) => {
 
 app.post("/api/gemini-agent", async (req, res) => {
   const { query } = req.body;
-  const prompt = `
-You are a simple healthcare assistant for rural patients in Nabha, Punjab.
-- Respond in the same language as the query (English, Hindi, Punjabi).
-- Reply short, clear, and friendly.
-- Use Markdown with these sections:
-  1. Possible Causes
-  2. Basic Precautions
-  3. Simple Home/Traditional Remedies
-  4. Common OTC Medicines
-  5. When to See a Doctor
-  6. Serious Warning Signs
 
-Patient says: "${query}"
-`;
+  if (!process.env.OPENAI_API_KEY) {
+    console.error("❌ Missing OPENAI_API_KEY environment variable");
+    return res.status(500).json({ reply: "AI सेवा उपलब्ध नहीं है। कृपया बाद में प्रयास करें।" });
+  }
+
+  const prompt = `You are a simple healthcare assistant for rural patients in Nabha, Punjab.
+Respond in the same language as the query (English, Hindi, Punjabi).
+Reply short, clear, and friendly.
+Use Markdown with these sections:
+1. Possible Causes
+2. Basic Precautions
+3. Simple Home/Traditional Remedies
+4. Common OTC Medicines
+5. When to See a Doctor
+6. Serious Warning Signs`;
+
   try {
     const completion = await openai.chat.completions.create({
       model: process.env.OPENAI_MODEL || "gpt-4o",
       messages: [
         { role: "system", content: "You are a concise rural healthcare assistant. Mirror the patient's language (English, Hindi, Punjabi). Use Markdown with the specified sections." },
-        { role: "user", content: prompt }
+        { role: "user", content: query }
       ],
       temperature: 0.7
     });
