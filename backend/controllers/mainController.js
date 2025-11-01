@@ -248,9 +248,27 @@ export const startCall = async (req, res) => {
     }
 
     const { patientId, appointmentId } = req.body;
-    if (!patientId || !appointmentId) {
-        return res.status(400).json({ message: 'patientId and appointmentId are required.' });
+    
+    // Enhanced validation with better error messages
+    if (!patientId) {
+      console.error('❌ startCall: Missing patientId', { body: req.body });
+      return res.status(400).json({ 
+        success: false,
+        message: 'patientId is required.',
+        receivedBody: req.body 
+      });
     }
+    
+    if (!appointmentId) {
+      console.error('❌ startCall: Missing appointmentId', { body: req.body });
+      return res.status(400).json({ 
+        success: false,
+        message: 'appointmentId is required.',
+        receivedBody: req.body 
+      });
+    }
+
+    console.log('✅ startCall: Valid request', { patientId, appointmentId, doctor: req.user.id });
 
     const io = req.app.get('io');
     if (io) {
@@ -262,12 +280,15 @@ export const startCall = async (req, res) => {
         timestamp: Date.now(),
         type: 'call-notification',
       });
+      console.log('📞 Emitted webrtc:start-call to patient:', patientId);
+    } else {
+      console.warn('⚠️ Socket.io not available');
     }
 
-    res.json({ message: 'Call initiated successfully.' });
+    res.json({ success: true, message: 'Call initiated successfully.' });
   } catch (err) {
     console.error('Error starting call:', err);
-    res.status(500).json({ message: 'Failed to start call.' });
+    res.status(500).json({ success: false, message: 'Failed to start call.', error: err.message });
   }
 };
 

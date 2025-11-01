@@ -217,6 +217,16 @@ export default function DoctorDashboard() {
     navigate(`/call/${appointmentId}?patientId=${actualPatientId}&doctorId=${doctorId}`);
 
     // ✅ Emit start-call event
+    // Log the IDs being used
+    console.log('📞 Start call - IDs check:', {
+      patientId,
+      appointmentId,
+      hasPatientId: !!patientId,
+      hasAppointmentId: !!appointmentId,
+      patientIdType: typeof patientId,
+      appointmentIdType: typeof appointmentId
+    });
+
     socket.emit("webrtc:start-call", {
       patientId,
       fromUserName: currentUser?.name || 'Doctor',
@@ -229,7 +239,13 @@ export default function DoctorDashboard() {
         method: 'POST',
         body: JSON.stringify({ patientId, appointmentId }),
       });
-      if (!res.ok) console.warn('Start-call API returned non-ok status:', res.status);
+      if (!res.ok) {
+        console.warn('Start-call API returned non-ok status:', res.status);
+        const errorData = await res.json().catch(() => ({}));
+        console.error('API Error response:', errorData);
+      } else {
+        console.log('✅ Start-call API successful');
+      }
     } catch (error) {
       console.error("Failed to signal start of call:", error);
     }
@@ -881,6 +897,7 @@ export default function DoctorDashboard() {
   const upcomingPreview = patientQueue.slice(0, 6).map((a) => ({
     name: a.patient?.name || a.name || 'Unknown',
     appointmentId: a._id || a.appointmentId,
+    patientId: a.patient?._id || a.patientId,
     time: a.slot || a.time || a.date || ''
   }));
 
@@ -936,7 +953,7 @@ export default function DoctorDashboard() {
                           <strong>{p.name}</strong>
                           {p.time ? <span style={{ color: '#00ffd0', marginLeft: 8 }}>{p.time}</span> : null}
                           <div style={{ marginTop: 8 }}>
-                            <button className="btn btn-primary" style={{ marginRight: 8 }} onClick={() => handleStartCall(null, p.appointmentId)}>Start Call</button>
+                            <button className="btn btn-primary" style={{ marginRight: 8 }} onClick={() => handleStartCall(p.patientId, p.appointmentId)}>Start Call</button>
                             <button className="btn btn-secondary" onClick={() => handleMarkComplete(p.appointmentId)}>Mark Done</button>
                           </div>
                         </li>
