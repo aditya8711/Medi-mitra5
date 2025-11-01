@@ -18,41 +18,43 @@ export default function useWebRTC(user) {
   const pendingRemoteStreamRef = useRef(null); // Store remote stream when video element isn't ready
   const lastRemoteStreamIdRef = useRef(null); // Track the stream already attached to avoid duplicate loads
 
-  const ensureRemotePlayback = (videoEl) => {
-    if (!videoEl) {
+  const ensureRemotePlayback = (videoEl, attempt = 0) => {
+    if (!videoEl) return;
+    if (videoEl !== remoteVideoRef.current) return; // element replaced
+    if (!videoEl.srcObject) return;
+
+    const maxAttempts = 7;
+    const scheduleRetry = (reason) => {
+      if (attempt >= maxAttempts) {
+        console.warn('⚠️ Remote autoplay giving up after max attempts:', reason);
+        return;
+      }
+      const delay = Math.min(750, 120 * (attempt + 1));
+      setTimeout(() => ensureRemotePlayback(videoEl, attempt + 1), delay);
+    };
+
+    if (!videoEl.isConnected) {
+      console.debug('⏸️ Remote video element not yet in DOM, retrying autoplay');
+      scheduleRetry('not-connected');
       return;
     }
 
-    const attemptPlay = () => {
-      if (!videoEl.isConnected) {
-        console.warn('⏭️ Skipping remote autoplay - element not in DOM');
-        return;
-      }
-      videoEl.play().catch(err => {
-        console.warn('⚠️ Remote video autoplay failed (attempt):', err);
-        setTimeout(() => {
-          if (!videoEl.isConnected) {
-            console.warn('⏭️ Skipping remote autoplay retry - element not in DOM');
-            return;
-          }
-          videoEl.play().catch(e => console.warn('⚠️ Retry remote play failed:', e));
-        }, 250);
+    const playPromise = videoEl.play();
+    if (playPromise && typeof playPromise.catch === 'function') {
+      playPromise.catch(err => {
+        console.warn('⚠️ Remote video autoplay failed (attempt):', err?.message || err);
+        if (err?.name === 'AbortError' || /interrupted/i.test(err?.message || '')) {
+          scheduleRetry('abort');
+        } else if (err?.name === 'NotAllowedError') {
+          // keep muted and retry, browser may allow once layout settles
+          scheduleRetry('not-allowed');
+        }
       });
-    };
+    }
 
-    if (videoEl.readyState >= 1) {
-      attemptPlay();
-    } else {
-      videoEl.addEventListener('loadedmetadata', attemptPlay, { once: true });
-      setTimeout(() => {
-        if (!videoEl.isConnected) {
-          console.warn('⏭️ Skipping remote autoplay fallback - element not in DOM');
-          return;
-        }
-        if (videoEl.readyState < 1) {
-          attemptPlay();
-        }
-      }, 500);
+    if (videoEl.readyState < 1) {
+      const onLoaded = () => ensureRemotePlayback(videoEl, attempt);
+      videoEl.addEventListener('loadedmetadata', onLoaded, { once: true });
     }
   };
 
@@ -260,6 +262,9 @@ export default function useWebRTC(user) {
 
             videoEl.srcObject = s;
             videoEl.muted = true; // keep muted for autoplay compliance
+            videoEl.autoplay = true;
+            videoEl.playsInline = true;
+            videoEl.preload = 'auto';
             lastRemoteStreamIdRef.current = s.id;
 
             ensureRemotePlayback(videoEl);
@@ -478,6 +483,9 @@ export default function useWebRTC(user) {
           remoteVideoRef.current.srcObject = stream;
           // keep muted for autoplay compliance; UI can unmute later
           remoteVideoRef.current.muted = true;
+          remoteVideoRef.current.autoplay = true;
+          remoteVideoRef.current.playsInline = true;
+          remoteVideoRef.current.preload = 'auto';
           lastRemoteStreamIdRef.current = stream.id;
           ensureRemotePlayback(remoteVideoRef.current);
         } catch (err) {
