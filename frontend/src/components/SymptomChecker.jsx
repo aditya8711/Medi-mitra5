@@ -75,7 +75,7 @@ export default function SymptomChecker() {
       </button>
 
       {result && (
-        <div className="result markdown-output">
+        <div className="result markdown-output"> Lorem ipsum dolor sit amet consectetur adipisicing elit. Maxime voluptate in tempore nam quas! Fuga animi, alias minus sequi accusamus beatae ducimus numquam quo, suscipit laborum tempore pariatur deleniti, harum nobis dolorem sint sapiente magnam velit! Modi, eius quaerat enim laudantium aut vel commodi provident non optio neque saepe ab a amet ducimus sint illum voluptatem fugit quibusdam hic temporibus quod nisi! Animi omnis magni nam dolores suscipit dolorem dolor! Asperiores modi veritatis impedit iste quis aliquam temporibus quod ratione, et maxime tenetur. Nemo, asperiores, laboriosam quae molestiae recusandae vel tempora perferendis optio aperiam eum qui repudiandae ratione! Ex, deleniti!
           <ReactMarkdown>{result}</ReactMarkdown>
         </div>
       )}

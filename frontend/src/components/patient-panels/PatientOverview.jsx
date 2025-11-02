@@ -93,19 +93,29 @@ const PatientOverview = ({ user, setActivePanel, appointments = [], prescription
         </div>
 
         <div>
-          <div className="detail-item">
+          <div className="detail-item health-snapshot-card">
             <strong>Health Snapshot</strong>
-            <div style={{ marginTop: 10, display: 'flex', gap: 10 }}>
-              <div className="detail-item"><div className="badge">{currentMedicines?.length || 0}</div><div style={{ fontSize: 12 }}>{t('activeMedicines')}</div></div>
-              <div className="detail-item"><div className="badge">{appointments?.length || 0}</div><div style={{ fontSize: 12 }}>{t('appointmentsLabel')}</div></div>
-              <div className="detail-item"><div className="badge">{prescriptions?.length || 0}</div><div style={{ fontSize: 12 }}>{t('prescriptionsLabel')}</div></div>
+
+            <div className="health-metrics">
+              <div className="metric-card">
+                <div className="badge metric-value">{currentMedicines?.length || 0}</div>
+                <div className="metric-label">{t('activeMedicines')}</div>
+              </div>
+              <div className="metric-card">
+                <div className="badge metric-value">{appointments?.length || 0}</div>
+                <div className="metric-label">{t('appointmentsLabel')}</div>
+              </div>
+              <div className="metric-card">
+                <div className="badge metric-value">{prescriptions?.length || 0}</div>
+                <div className="metric-label">{t('prescriptionsLabel')}</div>
+              </div>
             </div>
 
             <div className="actions-row">
-              <button className="btn" onClick={() => setActivePanel("book")}>{t('bookAppointmentBtn') || t('book')}</button>
-              <button className="btn" onClick={() => setActivePanel("records")}>{t('viewRecordsBtn') || t('records')}</button>
-              <button className="btn" onClick={() => setActivePanel("medicines")}>{t('medicineTrackerBtn') || t('medicineTrackerTitle')}</button>
-              <button className="btn" onClick={() => setActivePanel("symptoms")}>{t('symptomCheckerTitle')}</button>
+              <button className="btn action-btn" onClick={() => setActivePanel('book')}>{t('bookAppointmentBtn') || t('book')}</button>
+              <button className="btn action-btn" onClick={() => setActivePanel('records')}>{t('viewRecordsBtn') || t('records')}</button>
+              <button className="btn action-btn" onClick={() => setActivePanel('medicines')}>{t('medicineTrackerBtn') || t('medicineTrackerTitle')}</button>
+              <button className="btn action-btn" onClick={() => setActivePanel('symptoms')}>{t('symptomCheckerTitle')}</button>
             </div>
           </div>
 
