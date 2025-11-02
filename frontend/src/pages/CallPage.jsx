@@ -127,12 +127,34 @@ export default function CallPage() {
     if (!appointmentData) return;
 
     if (user?.role === 'doctor' && callState === 'idle') {
-      // Doctor initiates the call - prefer URL patient ID over appointment data
-      const targetUserId = resolvedPatientId || appointmentData.patientId;
-      if (targetUserId && isValidMongoId(targetUserId)) {
-        console.log(`🔄 Doctor starting call to patient:`, targetUserId);
-        console.log(`📋 Using patientId from: ${resolvedPatientId ? 'URL params' : 'appointment data'}`);
+      const appointmentPatientId = appointmentData?.patientId;
+      const urlPatientId = resolvedPatientId;
+      let targetUserId = null;
+      let sourceLabel = 'unknown';
+
+      if (appointmentPatientId && isValidMongoId(appointmentPatientId)) {
+        targetUserId = appointmentPatientId;
+        sourceLabel = 'appointment data';
+        if (urlPatientId && urlPatientId !== appointmentPatientId) {
+          console.warn('⚠️ Patient ID mismatch detected between URL param and appointment data', {
+            urlPatientId,
+            appointmentPatientId
+          });
+        }
+      } else if (urlPatientId && isValidMongoId(urlPatientId)) {
+        targetUserId = urlPatientId;
+        sourceLabel = 'URL params (fallback)';
+      }
+
+      if (targetUserId) {
+        console.log('🔄 Doctor starting call to patient:', targetUserId);
+        console.log(`📋 Using patientId from: ${sourceLabel}`);
         startCall(targetUserId);
+      } else {
+        console.error('❌ No valid patient ID available to initiate call', {
+          appointmentPatientId,
+          urlPatientId
+        });
       }
     } else if (user?.role === 'patient' && callState === 'idle') {
       // Patient waits for offers - no action needed here

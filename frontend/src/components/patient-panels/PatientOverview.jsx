@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import '../../styles/patient-overview.premium.css';
 import { useLanguage } from '../../utils/LanguageProvider';
 import { useDispatch } from 'react-redux';
@@ -13,18 +13,18 @@ const compactDate = (d) => {
   }
 };
 
-const PatientOverview = ({ user, setActivePanel, appointments = [], prescriptions = [], currentMedicines = [] }) => {
+const PatientOverview = ({ user, setActivePanel, appointments = [], prescriptions = [], currentMedicines = [], latestPrescriptionAt = null }) => {
   const upcoming = (appointments || [])
     .filter(a => a && a.date)
     .sort((a, b) => new Date(a.date) - new Date(b.date))
     .slice(0, 3);
-
   const recentPrescriptions = (prescriptions || []).slice(0, 3);
 
   const { t } = useLanguage();
   const dispatch = useDispatch();
 
   const [editing, setEditing] = useState(false);
+  const [hasUnseenPrescription, setHasUnseenPrescription] = useState(false);
   const [form, setForm] = useState({
     name: user?.name || '',
     age: user?.age || '',
@@ -51,6 +51,40 @@ const PatientOverview = ({ user, setActivePanel, appointments = [], prescription
       alert(err.message || 'Failed to update profile');
     }
   };
+
+  useEffect(() => {
+    const evaluate = () => {
+      if (!latestPrescriptionAt) {
+        setHasUnseenPrescription(false);
+        return;
+      }
+
+      try {
+        const stored = typeof window !== 'undefined'
+          ? window.localStorage.getItem('mm_prescription_last_seen')
+          : null;
+        const latestIso = new Date(latestPrescriptionAt).toISOString();
+        if (!stored || new Date(latestIso) > new Date(stored)) {
+          setHasUnseenPrescription(true);
+        } else {
+          setHasUnseenPrescription(false);
+        }
+      } catch (err) {
+        console.warn('Prescription badge state unavailable', err);
+        setHasUnseenPrescription(true);
+      }
+    };
+
+    evaluate();
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('mm:prescriptions-seen', evaluate);
+      return () => {
+        window.removeEventListener('mm:prescriptions-seen', evaluate);
+      };
+    }
+    return undefined;
+  }, [latestPrescriptionAt]);
 
   return (
     <div>
@@ -106,6 +140,9 @@ const PatientOverview = ({ user, setActivePanel, appointments = [], prescription
                 <div className="metric-label">{t('appointmentsLabel')}</div>
               </div>
               <div className="metric-card">
+                {hasUnseenPrescription && (
+                  <span className="metric-indicator">New</span>
+                )}
                 <div className="badge metric-value">{prescriptions?.length || 0}</div>
                 <div className="metric-label">{t('prescriptionsLabel')}</div>
               </div>
@@ -125,8 +162,8 @@ const PatientOverview = ({ user, setActivePanel, appointments = [], prescription
               {recentPrescriptions.length > 0 ? (
                 recentPrescriptions.map((p, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <div>{p.medicationName || p.name || 'Prescription'}</div>
-                    <div style={{ color: '#6b7280' }}>{compactDate(p.date)}</div>
+                    <div>{p.medicines && p.medicines[0]?.name ? p.medicines[0].name : (p.medicationName || p.name || 'Prescription')}</div>
+                    <div style={{ color: '#6b7280' }}>{compactDate(p.createdAt || p.date)}</div>
                   </div>
                 ))
               ) : (

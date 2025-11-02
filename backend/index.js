@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 import bodyParser from "body-parser";
 import mongoose from "mongoose";
 import cookieParser from "cookie-parser";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import OpenAI from "openai";
 import mainRoutes from "./routes/main.js";
 import protectedRoutes from "./routes/protected.js";
 import Appointment from "./models/Appointment.js";
@@ -13,7 +13,7 @@ import prescriptionRoutes from "./routes/prescriptionRoutes.js";
 import http from "http";
 import { Server as SocketIOServer } from "socket.io";
 import initSocket from "./services/socket.js";
-import Ragroutes from "./routes/ragRoutes.js";
+// import Ragroutes from "./routes/ragRoutes.js";
 import os from "os";   // ✅ Added to detect IPv4
 
 dotenv.config();
@@ -45,11 +45,10 @@ app.use("/api/auth", authRoutes);
 app.use("/api", mainRoutes);
 app.use("/api", protectedRoutes);
 app.use("/api", prescriptionRoutes);
-app.use("/api", Ragroutes);
+// app.use("/api", Ragroutes);
 
-// Gemini agent
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+// OpenAI client (GPT-4 powered)
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 app.get("/", (req, res) => {
   res.status(200).json({
@@ -59,26 +58,51 @@ app.get("/", (req, res) => {
 });
 
 app.post("/api/gemini-agent", async (req, res) => {
-  const { query } = req.body;
-  const prompt = `
-You are a simple healthcare assistant for rural patients in Nabha, Punjab.
-- Respond in the same language as the query (English, Hindi, Punjabi).
-- Reply short, clear, and friendly.
-- Use Markdown with these sections:
-  1. Possible Causes
-  2. Basic Precautions
-  3. Simple Home/Traditional Remedies
-  4. Common OTC Medicines
-  5. When to See a Doctor
-  6. Serious Warning Signs
+  const { query, language } = req.body;
 
-Patient says: "${query}"
-`;
+  if (!process.env.OPENAI_API_KEY) {
+    console.error("❌ Missing OPENAI_API_KEY environment variable");
+    return res.status(500).json({ reply: "AI सेवा उपलब्ध नहीं है। कृपया बाद में प्रयास करें।" });
+  }
+
+  if (!query || !query.trim()) {
+    return res.status(400).json({ reply: "कृपया अपने लक्षण या प्रश्न लिखें।" });
+  }
+
+  const languageMap = {
+    hi: { name: "Hindi", script: "देवनागरी" },
+    pa: { name: "Punjabi", script: "ਗੁਰਮੁਖੀ" },
+    en: { name: "English", script: "Latin" },
+  };
+  const normalizedLang = (language || "").toLowerCase();
+  const languageMeta = languageMap[normalizedLang] || languageMap.en;
+
+  const prompt = `You are a simple healthcare assistant for rural patients in Nabha, Punjab.
+Always respond entirely in ${languageMeta.name} using the ${languageMeta.script} script. Do not switch languages.
+Reply short, clear, and friendly.
+Use Markdown with these sections:
+1. Possible Causes
+2. Basic Precautions
+3. Simple Home/Traditional Remedies
+4. Common OTC Medicines
+5. When to See a Doctor
+6. Serious Warning Signs
+Do not copy the patient's words verbatim. Summarise their symptoms first, then give fresh guidance.`;
+
   try {
-    const result = await model.generateContent(prompt);
-    const response = await result.response.text();
+    const completion = await openai.chat.completions.create({
+      model: process.env.OPENAI_MODEL || "gpt-4o-mini" || "gpt-3.5-turbo",
+      messages: [
+        { role: "system", content: prompt },
+        { role: "user", content: `Patient details (language: ${languageMeta.name}): ${query}\nPlease analyse the symptoms above and respond with clear advice without repeating the exact phrases.` }
+      ],
+      temperature: 0.7
+    });
+
+    const response = completion.choices[0]?.message?.content?.trim() || "";
     res.json({ reply: response });
-  } catch {
+  } catch (error) {
+    console.error("❌ OpenAI request failed:", error?.message || error);
     res.status(500).json({ reply: "AI से जवाब नहीं मिला। कृपया बाद में प्रयास करें।" });
   }
 });

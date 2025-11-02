@@ -3,13 +3,13 @@ import ReactMarkdown from "react-markdown";
 import "../styles/page.css";
 import { useLanguage } from '../utils/LanguageProvider';
 
-
-
 export default function SymptomChecker() {
   const [selectedSymptoms, setSelectedSymptoms] = useState([]);
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
-  const { t } = useLanguage();
+  const [showOverlay, setShowOverlay] = useState(false);
+  const [hasResult, setHasResult] = useState(false);
+  const { t, lang } = useLanguage();
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -32,30 +32,44 @@ export default function SymptomChecker() {
 
     setLoading(true);
     setResult("");
+    setShowOverlay(false);
+    setHasResult(false);
 
     try {
       const res = await fetch(`${API_URL}/api/gemini-agent`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          query: `${t('patientQueryPrefix') || 'Patient reports the following symptoms:'} ${selectedSymptoms.join(", ")}.`
+          query: `${t('patientQueryPrefix') || 'Patient reports the following symptoms:'} ${selectedSymptoms.join(", ")}.`,
+          language: lang
         }),
       });
 
       const data = await res.json();
-      setResult(data.reply || t('aiNoResponse'));
+      const reply = data.reply || t('aiNoResponse');
+      const hasReply = !!reply;
+      setResult(reply);
+      setHasResult(hasReply);
+      setShowOverlay(hasReply);
     } catch (err) {
       console.error("Error calling AI:", err);
-      setResult(t('aiError'));
+      const fallback = t('aiError');
+      setResult(fallback);
+      setHasResult(true);
+      setShowOverlay(true);
     } finally {
       setLoading(false);
     }
   };
 
+  const closeOverlay = () => {
+    setShowOverlay(false);
+  };
+
   return (
     <div className="symptom-checker">
-  <h2>🧠 {t('symptomCheckerTitle')}</h2>
-  <p>{t('selectSymptoms')}</p>
+      <h2>{t('symptomCheckerTitle')}</h2>
+      <p>{t('selectSymptoms')}</p>
 
       <div className="symptom-grid">
         {(localizedSymptoms.length ? localizedSymptoms : ["Fever","Cough"]).map((symptom) => (
@@ -71,12 +85,45 @@ export default function SymptomChecker() {
       </div>
 
       <button className="check-button" onClick={checkSymptoms} disabled={loading}>
-        {loading ? `⏳ ${t('checking')}` : `✅ ${t('checkSymptomsButton')}`}
+        {loading ? `${t('checking')}` : `${t('checkSymptomsButton')}`}
       </button>
 
       {result && (
-        <div className="result markdown-output"> Lorem ipsum dolor sit amet consectetur adipisicing elit. Maxime voluptate in tempore nam quas! Fuga animi, alias minus sequi accusamus beatae ducimus numquam quo, suscipit laborum tempore pariatur deleniti, harum nobis dolorem sint sapiente magnam velit! Modi, eius quaerat enim laudantium aut vel commodi provident non optio neque saepe ab a amet ducimus sint illum voluptatem fugit quibusdam hic temporibus quod nisi! Animi omnis magni nam dolores suscipit dolorem dolor! Asperiores modi veritatis impedit iste quis aliquam temporibus quod ratione, et maxime tenetur. Nemo, asperiores, laboriosam quae molestiae recusandae vel tempora perferendis optio aperiam eum qui repudiandae ratione! Ex, deleniti!
+        <div className="result markdown-output">
           <ReactMarkdown>{result}</ReactMarkdown>
+        </div>
+      )}
+
+      {hasResult && (
+        <button
+          type="button"
+          className="symptom-checker__expand"
+          onClick={() => setShowOverlay(true)}
+        >
+          {t('expandFullView') || 'View full report'}
+        </button>
+      )}
+
+      {showOverlay && result && (
+        <div className="symptom-checker-overlay" role="dialog" aria-modal="true">
+          <div
+            className="symptom-checker-overlay__backdrop"
+            onClick={closeOverlay}
+            aria-hidden="true"
+          />
+          <div className="symptom-checker-overlay__card">
+            <button
+              type="button"
+              className="symptom-checker-overlay__close"
+              onClick={closeOverlay}
+              aria-label={t('close') || 'Close'}
+            >
+              ×
+            </button>
+            <div className="symptom-checker-overlay__content markdown-output">
+              <ReactMarkdown>{result}</ReactMarkdown>
+            </div>
+          </div>
         </div>
       )}
     </div>

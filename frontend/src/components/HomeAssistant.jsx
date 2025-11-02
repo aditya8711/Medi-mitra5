@@ -2,10 +2,12 @@ import React, { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import AnimatedButton from "./AnimatedButton";
 import logo from "../logo.png";
+import { useLanguage } from "../utils/LanguageProvider";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export default function HomeAssistant() {
+  const { lang } = useLanguage();
   const [user, setUser] = useState(null);
   useEffect(() => {
     fetch(`${API_URL}/api/auth/me`, { credentials: "include" })
@@ -60,7 +62,7 @@ export default function HomeAssistant() {
       const res = await fetch(`${API_URL}/api/gemini-agent`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ query, language: lang }),
       });
       if (!res.ok) throw new Error("Server error");
       const data = await res.json();

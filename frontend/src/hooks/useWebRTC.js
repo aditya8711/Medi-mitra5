@@ -16,21 +16,78 @@ export default function useWebRTC(user) {
   const remoteUserIdRef = useRef(null);
   const queuedCandidatesRef = useRef([]); // Queue ICE candidates until remote description is set
   const pendingRemoteStreamRef = useRef(null); // Store remote stream when video element isn't ready
+  const lastRemoteStreamIdRef = useRef(null); // Track the stream already attached to avoid duplicate loads
+
+  const ensureRemotePlayback = (videoEl, attempt = 0) => {
+    if (!videoEl) return;
+    if (videoEl !== remoteVideoRef.current) return; // element replaced during retry
+    if (!videoEl.srcObject) return;
+
+    // If already playing, nothing else to do
+    if (!videoEl.paused && !videoEl.ended && videoEl.readyState >= 2) {
+      return;
+    }
+
+    const maxAttempts = 9;
+    const scheduleRetry = (reason) => {
+      if (attempt >= maxAttempts) {
+        console.warn('⚠️ Remote autoplay giving up after max attempts:', reason);
+        return;
+      }
+      const delay = Math.min(900, 150 * (attempt + 1));
+      setTimeout(() => ensureRemotePlayback(remoteVideoRef.current, attempt + 1), delay);
+    };
+
+    if (!videoEl.isConnected) {
+      console.debug('⏸️ Remote video element not yet in DOM, retrying autoplay');
+      scheduleRetry('not-connected');
+      return;
+    }
+
+    const attemptPlay = () => {
+      if (!videoEl || videoEl !== remoteVideoRef.current) return;
+      if (!videoEl.srcObject) return;
+
+      const playPromise = videoEl.play();
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(err => {
+          console.warn('⚠️ Remote video autoplay failed (attempt):', err?.message || err);
+          if (err?.name === 'AbortError' || /interrupted/i.test(err?.message || '')) {
+            scheduleRetry('abort');
+          } else if (err?.name === 'NotAllowedError') {
+            scheduleRetry('not-allowed');
+          }
+        });
+      }
+    };
+
+    if (videoEl.readyState < 1) {
+      const onLoaded = () => ensureRemotePlayback(remoteVideoRef.current, attempt);
+      videoEl.addEventListener('loadedmetadata', onLoaded, { once: true });
+    }
+
+    requestAnimationFrame(() => {
+      if (!videoEl.isConnected) {
+        scheduleRetry('raf-not-connected');
+        return;
+      }
+      attemptPlay();
+    });
+  };
 
   // Enhanced ICE servers for better connectivity
   const iceServers = [
     { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
-    { urls: "stun:stun.cloudflare.com:3478" },
-    { 
-      urls: ["turn:relay1.expressturn.com:3478?transport=udp", "turn:relay1.expressturn.com:3478?transport=tcp"],
-      username: "efCZWX3MTI071W2V6N", 
-      credential: "mGWa8dVKpR4FgpE" 
-    },
+    { urls: "stun:stun.relay.metered.ca:80" },
     {
-      urls: ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443"],
-      username: "openrelayproject",
-      credential: "openrelayproject"
+      urls: [
+        "turn:global.relay.metered.ca:80",
+        "turn:global.relay.metered.ca:80?transport=tcp",
+        "turn:global.relay.metered.ca:443",
+        "turns:global.relay.metered.ca:443?transport=tcp"
+      ],
+      username: "fccf4b3716ec7a673902fe44",
+      credential: "I6Yf9nfUgNtctLfR"
     }
   ];
 
@@ -210,15 +267,32 @@ export default function useWebRTC(user) {
         
         // Store the stream for later attachment if video element isn't ready
         pendingRemoteStreamRef.current = stream;
-        
+
+        const attachStream = (videoEl, s) => {
+          try {
+            if (videoEl.srcObject === s || lastRemoteStreamIdRef.current === s.id) {
+              console.log('🔁 Remote stream already attached, ensuring playback');
+              ensureRemotePlayback(videoEl);
+              return;
+            }
+
+            videoEl.srcObject = s;
+            videoEl.muted = true; // keep muted for autoplay compliance
+            videoEl.autoplay = true;
+            videoEl.playsInline = true;
+            videoEl.preload = 'auto';
+            lastRemoteStreamIdRef.current = s.id;
+
+            ensureRemotePlayback(videoEl);
+          } catch (err) {
+            console.warn('⚠️ Error attaching remote stream:', err);
+          }
+        };
+
         if (remoteVideoRef.current) {
           console.log('✅ Video element ready, attaching stream immediately');
-          remoteVideoRef.current.srcObject = stream;
-          
-          // Force video element to play
-          remoteVideoRef.current.play().catch(e => {
-            console.warn('⚠️ Remote video autoplay failed:', e);
-          });
+          // schedule attachment on next tick to avoid DOM removal race
+          setTimeout(() => attachStream(remoteVideoRef.current, stream), 0);
         } else {
           console.log('📦 Video element not ready, stream stored for later attachment');
         }
@@ -405,21 +479,37 @@ export default function useWebRTC(user) {
   const retryRemoteStreamAttachment = () => {
     if (pendingRemoteStreamRef.current && remoteVideoRef.current && !remoteVideoRef.current.srcObject) {
       console.log('🔄 Retrying remote stream attachment');
+      const stream = pendingRemoteStreamRef.current;
       console.log('🎥 Attaching pending remote stream:', {
-        streamId: pendingRemoteStreamRef.current.id,
-        videoTracks: pendingRemoteStreamRef.current.getVideoTracks().length,
-        audioTracks: pendingRemoteStreamRef.current.getAudioTracks().length,
-        active: pendingRemoteStreamRef.current.active
+        streamId: stream.id,
+        videoTracks: stream.getVideoTracks().length,
+        audioTracks: stream.getAudioTracks().length,
+        active: stream.active
       });
-      
-      remoteVideoRef.current.srcObject = pendingRemoteStreamRef.current;
-      
-      // Force video element to play
-      remoteVideoRef.current.play().catch(e => {
-        console.warn('⚠️ Remote video autoplay failed:', e);
-      });
-      
-      console.log('✅ Pending remote stream attached successfully');
+
+      // reuse same attachment strategy as ontrack
+      setTimeout(() => {
+        try {
+          if (remoteVideoRef.current.srcObject === stream || lastRemoteStreamIdRef.current === stream.id) {
+            console.log('🔁 Remote stream already attached during retry, ensuring playback');
+            remoteVideoRef.current.muted = true;
+            ensureRemotePlayback(remoteVideoRef.current);
+            return;
+          }
+          remoteVideoRef.current.srcObject = stream;
+          // keep muted for autoplay compliance; UI can unmute later
+          remoteVideoRef.current.muted = true;
+          remoteVideoRef.current.autoplay = true;
+          remoteVideoRef.current.playsInline = true;
+          remoteVideoRef.current.preload = 'auto';
+          lastRemoteStreamIdRef.current = stream.id;
+          ensureRemotePlayback(remoteVideoRef.current);
+        } catch (err) {
+          console.warn('⚠️ Error during retry attachment:', err);
+        }
+      }, 0);
+
+      console.log('✅ Pending remote stream attachment scheduled');
       return true;
     }
     return false;
@@ -434,6 +524,13 @@ export default function useWebRTC(user) {
       return true;
     }
     return false;
+  };
+
+  const unmuteRemote = () => {
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.muted = false;
+      ensureRemotePlayback(remoteVideoRef.current);
+    }
   };
 
   // End call
@@ -458,6 +555,7 @@ export default function useWebRTC(user) {
     remoteUserIdRef.current = null;
     queuedCandidatesRef.current = []; // Clear queued candidates
     pendingRemoteStreamRef.current = null; // Clear pending remote stream
+    lastRemoteStreamIdRef.current = null; // Reset attached stream tracker
     
     // Clear video elements
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
@@ -472,6 +570,7 @@ export default function useWebRTC(user) {
     endCall,
     retryRemoteStreamAttachment,
     retryLocalStreamAttachment,
+    unmuteRemote,
     incomingOffer,
     callState
   };
